@@ -2,12 +2,14 @@ import os
 from typing import Tuple, Dict, List, Optional, Callable, cast
 
 import numpy as np
+import torch
 
 from astropy.io import fits
 
 from scipy import ndimage
 
 from torchvision.datasets import DatasetFolder, folder
+
 
 
 class FitsFolder(DatasetFolder):
@@ -109,6 +111,11 @@ class FitsFolder(DatasetFolder):
         y_dat = fits.getdata(arr[3])
         z_dat = fits.getdata(arr[4])
 
+
+
+
+
+
         def conv_mapping(x):
             """
             When the fifth value (x[4]) of the filter array (the center of the window) is null, replace it with the mean
@@ -116,12 +123,19 @@ class FitsFolder(DatasetFolder):
             :param x:
             :return:
             """
-            if np.isnan(x[4]) and not np.isnan(np.delete(x, 4)).all():
-                return np.nanmean(np.delete(x, 4))
-            else:
+            if np.isnan(x[4]):  # x中至少有一个不为NULL的值
+                if not np.isnan(np.delete(x, 4)).all():
+                    return np.nanmean(np.delete(x, 4))
+                else:
+                    raise IOError
+            else:  # x中的所有值均为NULL
                 return x[4]
 
+
+
+
         mask = np.ones((3, 3))
+
         g_dat = ndimage.generic_filter(g_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
         i_dat = ndimage.generic_filter(i_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
         r_dat = ndimage.generic_filter(r_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)

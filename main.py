@@ -11,9 +11,6 @@ from sklearn.model_selection import StratifiedKFold
 from CelebDataset import CelebDataset
 from models.GalaxyClassifier import GalaxyClassifier
 
-
-
-
 tfs = transforms.Compose([
     transforms.ToTensor()
 ])
@@ -33,7 +30,7 @@ full_dataset = CelebDataset("images/train_set", transform=tfs)
 model = GalaxyClassifier().to(device)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.002)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 num_epochs = 10
 skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)  # divides dataset into 10 folds
 foldperf = {}
@@ -41,12 +38,13 @@ foldperf = {}
 
 def train_loop(dataloader, model, loss_fn, optimizer):
     model.train()
-    train_loss, train_correct = 0.0, 0
+    train_loss, train_correct = 0.0, 0.0
 
-    for batch, (images, labels) in enumerate(dataloader):
+    for minibatch, (images, labels) in enumerate(dataloader):
         # Compute prediction and loss:
         images, labels = images.to(device), labels.to(device)
         output = model(images)
+        hasNullValue = np.isnan(images).any()
         loss = loss_fn(output, labels)
 
         # Backpropagation
@@ -54,10 +52,10 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        train_loss += loss.item() * images.size(0)
+
+        train_loss += loss.item() * images.size(0)  # images.size(): torch.Size([30, 5, 240, 240])
         scores, predictions = torch.max(output.data, 1)
         train_correct += (predictions == labels).sum().item()
-        
 
     return train_loss, train_correct
 
@@ -77,7 +75,8 @@ def valid_loop(dataloader, model, loss_fn):
     return valid_loss, val_correct
 
 
-for fold, (train_idx, val_idx) in enumerate(skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
+for fold, (train_idx, val_idx) in enumerate(
+        skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
     print('Fold {}'.format(fold + 1))
 
     train_sampler = SubsetRandomSampler(train_idx)
