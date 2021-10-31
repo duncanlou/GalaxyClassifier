@@ -31,17 +31,16 @@ class FitsFolder(DatasetFolder):
                                          target_transform=target_transform)
 
     def find_classes(self, directory: str) -> Tuple[List[List[str]], Dict[str, int]]:
-        print("find_classes() will be invoked how many times?")
         src_entries = self.T[130000:140000]
         self.types = src_entries['class']
-        img_folders = os.listdir('data/images14')
+        img_folders = os.listdir('images14')
 
         img_files = []
         for i in range(len(img_folders)):
             img_folder = img_folders[i]
             tmp = []
-            for f_name in os.listdir(os.path.join('data/images14', img_folder)):
-                img_path = os.path.join(os.path.join('data/images14', img_folder), f_name)
+            for f_name in os.listdir(os.path.join('images14', img_folder)):
+                img_path = os.path.join(os.path.join('images14', img_folder), f_name)
                 tmp.append(img_path)
             img_files.append(tmp)
 
@@ -101,29 +100,31 @@ class FitsFolder(DatasetFolder):
         y_dat = fits.getdata(images[3])
         z_dat = fits.getdata(images[4])
 
-        # def conv_mapping(x):
-        #     """
-        #     When the fifth value (x[4]) of the filter array (the center of the window) is null, replace it with the mean
-        #     of the surrounding values
-        #     :param x:
-        #     :return:
-        #     """
-        #     if np.isnan(x[4]):  # x中至少有一个不为NULL的值
-        #         if not np.isnan(np.delete(x, 4)).all():
-        #             return np.nanmean(np.delete(x, 4))
-        #         else:
-        #             print(x)
-        #             raise IOError
-        #     else:  # x中的所有值均为NULL
-        #         return x[4]
-        #
-        # mask = np.ones((3, 3))
-        #
-        # g_dat = ndimage.generic_filter(g_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
-        # i_dat = ndimage.generic_filter(i_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
-        # r_dat = ndimage.generic_filter(r_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
-        # y_dat = ndimage.generic_filter(y_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
-        # z_dat = ndimage.generic_filter(z_dat, function=conv_mapping, footprint=mask, mode='constant', cval=np.NaN)
+        def conv_mapping(x):
+            """
+            When the fifth value (x[4]) of the filter array (the center of the window) is null, replace it with the mean
+            of the surrounding values
+            :param x:
+            :return:
+            """
+
+            if np.isnan(x[12]) and not np.isnan(np.delete(x, 12)).all():
+                return np.nanmean(np.delete(x, 12))
+            else:
+                if np.isnan(x[12]):
+                    print("x[5*5]全部为null")
+                    raise IOError
+                return x[12]
+
+
+
+        mask = np.ones((5, 5))
+
+        g_dat = ndimage.generic_filter(g_dat, function=conv_mapping, footprint=mask, mode='nearest')
+        i_dat = ndimage.generic_filter(i_dat, function=conv_mapping, footprint=mask, mode='nearest')
+        r_dat = ndimage.generic_filter(r_dat, function=conv_mapping, footprint=mask, mode='nearest')
+        y_dat = ndimage.generic_filter(y_dat, function=conv_mapping, footprint=mask, mode='nearest')
+        z_dat = ndimage.generic_filter(z_dat, function=conv_mapping, footprint=mask, mode='nearest')
 
         def fits_normalization(img_dat):
             if img_dat.shape != (240, 240):
