@@ -16,25 +16,24 @@ tfs = transforms.Compose([
     transforms.ToTensor()
 ])
 
-batch_size = 30
-number_of_labels = 3
+BATCH_SIZE = 512
+NUM_LABEL = 3
+NUM_EPOCH = 10
 
 print(torch.__version__)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using {} device'.format(device))
-torch.manual_seed(42)
+
 
 # 加载图像数据集，并在加载的时候对图像施加变换
-full_dataset = CelebDataset("data/images14", transform=tfs)
+full_dataset = CelebDataset("images14", transform=tfs)
 
 # Instantiate a neural network model
 model = GalaxyClassifier().to(device)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-num_epochs = 10
-skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)  # divides dataset into 10 folds
-foldperf = {}
+optimizer = optim.SGD(model.parameters(), lr=0.001)
+skf = StratifiedKFold()  # divides dataset into 10 folds
 
 
 def train_loop(dataloader, model, loss_fn, optimizer):
@@ -75,40 +74,38 @@ def valid_loop(dataloader, model, loss_fn):
     return valid_loss, val_correct
 
 
-train_idx, test_idx = skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)
+for fold, (train_idx, test_idx) in enumerate(
+        skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
+    print('Fold {}'.format(fold))
 
-# for fold, (train_idx, val_idx) in enumerate(
-#         skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
-#     print('Fold {}'.format(fold + 1))
-#
-#     train_sampler = SubsetRandomSampler(train_idx)
-#     test_sampler = SubsetRandomSampler(val_idx)
-#     train_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=train_sampler)
-#     test_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=test_sampler)
-#
-#     history = {'train_loss': [], 'test_loss': [], 'train_acc': [], 'test_acc': []}
-#
-#     for epoch in range(num_epochs):
-#         train_loss, train_correct = train_loop(train_loader, model, loss_fn, optimizer)
-#         test_loss, test_correct = valid_loop(test_loader, model, loss_fn)
-#
-#         train_loss = train_loss / len(train_loader.sampler)
-#         train_acc = train_correct / len(train_loader.sampler) * 100
-#         test_loss = test_loss / len(test_loader.sampler)
-#         test_acc = test_correct / len(test_loader.sampler) * 100
-#
-#         print(
-#             "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
-#                 epoch + 1,
-#                 num_epochs,
-#                 train_loss,
-#                 test_loss,
-#                 train_acc,
-#                 test_acc)
-#         )
-#         history['train_loss'].append(train_loss)
-#         history['test_loss'].append(test_loss)
-#         history['train_acc'].append(train_acc)
-#         history['test_acc'].append(test_acc)
-#
-#     foldperf['fold{}'.format(fold + 1)] = history
+    train_sampler = SubsetRandomSampler(train_idx)
+    test_sampler = SubsetRandomSampler(test_idx)
+    train_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, sampler=train_sampler)
+    test_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, sampler=test_sampler)
+
+    history = {'train_loss': [], 'test_loss': [], 'train_acc': [], 'test_acc': []}
+
+    for epoch in range(NUM_EPOCH):
+        train_loss, train_correct = train_loop(train_loader, model, loss_fn, optimizer)
+        test_loss, test_correct = valid_loop(test_loader, model, loss_fn)
+
+        train_loss = train_loss / len(train_loader.sampler)
+        train_acc = train_correct / len(train_loader.sampler) * 100
+        test_loss = test_loss / len(test_loader.sampler)
+        test_acc = test_correct / len(test_loader.sampler) * 100
+
+        print(
+            "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
+                epoch + 1,
+                NUM_EPOCH,
+                train_loss,
+                test_loss,
+                train_acc,
+                test_acc)
+        )
+        history['train_loss'].append(train_loss)
+        history['test_loss'].append(test_loss)
+        history['train_acc'].append(train_acc)
+        history['test_acc'].append(test_acc)
+
+    foldperf['fold{}'.format(fold + 1)] = history
