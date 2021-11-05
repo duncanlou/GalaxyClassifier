@@ -77,38 +77,38 @@ def valid_loop(dataloader, model, loss_fn):
 
 train_idx, test_idx = skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)
 
-# for fold, (train_idx, val_idx) in enumerate(
-#         skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
-#     print('Fold {}'.format(fold + 1))
-#
-#     train_sampler = SubsetRandomSampler(train_idx)
-#     test_sampler = SubsetRandomSampler(val_idx)
-#     train_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=train_sampler)
-#     test_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=test_sampler)
-#
-#     history = {'train_loss': [], 'test_loss': [], 'train_acc': [], 'test_acc': []}
-#
-#     for epoch in range(num_epochs):
-#         train_loss, train_correct = train_loop(train_loader, model, loss_fn, optimizer)
-#         test_loss, test_correct = valid_loop(test_loader, model, loss_fn)
-#
-#         train_loss = train_loss / len(train_loader.sampler)
-#         train_acc = train_correct / len(train_loader.sampler) * 100
-#         test_loss = test_loss / len(test_loader.sampler)
-#         test_acc = test_correct / len(test_loader.sampler) * 100
-#
-#         print(
-#             "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
-#                 epoch + 1,
-#                 num_epochs,
-#                 train_loss,
-#                 test_loss,
-#                 train_acc,
-#                 test_acc)
-#         )
-#         history['train_loss'].append(train_loss)
-#         history['test_loss'].append(test_loss)
-#         history['train_acc'].append(train_acc)
-#         history['test_acc'].append(test_acc)
-#
-#     foldperf['fold{}'.format(fold + 1)] = history
+for fold, (train_idx, val_idx) in enumerate(
+        skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
+    print('Fold {}'.format(fold + 1))
+
+    train_sampler = SubsetRandomSampler(train_idx)
+    test_sampler = SubsetRandomSampler(val_idx)
+    train_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=train_sampler)
+    test_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=test_sampler)
+
+    history = {'train_loss': [], 'test_loss': [], 'train_acc': [], 'test_acc': []}
+
+    for epoch in range(num_epochs):
+        train_loss, train_correct = train_loop(train_loader, model, loss_fn, optimizer)
+        test_loss, test_correct = valid_loop(test_loader, model, loss_fn)
+
+        train_loss = train_loss / len(train_loader.sampler)
+        train_acc = train_correct / len(train_loader.sampler) * 100
+        test_loss = test_loss / len(test_loader.sampler)
+        test_acc = test_correct / len(test_loader.sampler) * 100
+
+        print(
+            "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
+                epoch + 1,
+                num_epochs,
+                train_loss,
+                test_loss,
+                train_acc,
+                test_acc)
+        )
+        history['train_loss'].append(train_loss)
+        history['test_loss'].append(test_loss)
+        history['train_acc'].append(train_acc)
+        history['test_acc'].append(test_acc)
+
+    foldperf['fold{}'.format(fold + 1)] = history
