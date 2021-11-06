@@ -26,7 +26,7 @@ print('Using {} device'.format(device))
 
 
 # 加载图像数据集，并在加载的时候对图像施加变换
-full_dataset = CelebDataset("images14", transform=tfs)
+full_dataset = CelebDataset("data/images14", transform=tfs)
 
 # Instantiate a neural network model
 model = GalaxyClassifier().to(device)
@@ -74,18 +74,20 @@ def valid_loop(dataloader, model, loss_fn):
     return valid_loss, val_correct
 
 
-for fold, (train_idx, test_idx) in enumerate(
+train_idx, test_idx = skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)
+
+for fold, (train_idx, val_idx) in enumerate(
         skf.split(full_dataset.fits_folder.samples, full_dataset.fits_folder.targets)):
-    print('Fold {}'.format(fold))
+    print('Fold {}'.format(fold + 1))
 
     train_sampler = SubsetRandomSampler(train_idx)
-    test_sampler = SubsetRandomSampler(test_idx)
-    train_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, sampler=train_sampler)
-    test_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, sampler=test_sampler)
+    test_sampler = SubsetRandomSampler(val_idx)
+    train_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=train_sampler)
+    test_loader = DataLoader(full_dataset, batch_size=batch_size, sampler=test_sampler)
 
     history = {'train_loss': [], 'test_loss': [], 'train_acc': [], 'test_acc': []}
 
-    for epoch in range(NUM_EPOCH):
+    for epoch in range(num_epochs):
         train_loss, train_correct = train_loop(train_loader, model, loss_fn, optimizer)
         test_loss, test_correct = valid_loop(test_loader, model, loss_fn)
 
@@ -97,7 +99,7 @@ for fold, (train_idx, test_idx) in enumerate(
         print(
             "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
                 epoch + 1,
-                NUM_EPOCH,
+                num_epochs,
                 train_loss,
                 test_loss,
                 train_acc,
