@@ -1,9 +1,14 @@
 import os
+import shutil
 from typing import Tuple, Dict, List, Optional, Callable, cast
 
 import numpy as np
 from astropy.io import fits
+from scipy import ndimage
 from torchvision.datasets import DatasetFolder, folder
+
+
+mask = np.ones((3, 3))
 
 
 class FitsFolder(DatasetFolder):
@@ -25,7 +30,6 @@ class FitsFolder(DatasetFolder):
                                          target_transform=target_transform)
 
     def find_classes(self, directory: str) -> Tuple[List[List[str]], Dict[str, int]]:
-        print("find_classes() will be invoked how many times?")
         src_entries = self.T[130000:140000]
         self.types = src_entries['class']
         img_folders = os.listdir('data/images14')
@@ -96,24 +100,24 @@ class FitsFolder(DatasetFolder):
             img_dat[:][:] = (img_dat[:][:] - vmin) / (vmax - vmin)
             return img_dat
 
-        def fits_std(img_dat):
-            mean = np.mean(img_dat)
-            std = np.std(img_dat)
-            img_dat[:][:] = (img_dat[:][:] - mean) / std
-            return img_dat
+        # def fits_std(img_dat):
+        #     mean = np.mean(img_dat)
+        #     std = np.std(img_dat)
+        #     img_dat[:][:] = (img_dat[:][:] - mean) / std
+        #     return img_dat
 
         def dat_transform(raw_dat):
-            std_dat = fits_std(raw_dat)
-            norm_dat = fits_normalization(std_dat)
+            # std_dat = fits_std(raw_dat)
+            norm_dat = fits_normalization(raw_dat)
             return norm_dat
 
-        g_dat = fits.getdata(images[0])
-        i_dat = fits.getdata(images[1])
-        r_dat = fits.getdata(images[2])
-        y_dat = fits.getdata(images[3])
-        z_dat = fits.getdata(images[4])
+        g_fits_dat = fits.getdata(images[0])
+        i_fits_dat = fits.getdata(images[1])
+        r_fits_dat = fits.getdata(images[2])
+        y_fits_dat = fits.getdata(images[3])
+        z_fits_dat = fits.getdata(images[4])
 
-        dat = np.stack((g_dat, i_dat, r_dat, y_dat, z_dat), axis=2)
+        dat = np.stack((g_fits_dat, i_fits_dat, r_fits_dat, y_fits_dat, z_fits_dat), axis=2)
         dat = dat_transform(dat)
 
         return dat
