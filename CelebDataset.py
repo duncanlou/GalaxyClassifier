@@ -6,7 +6,6 @@ from FitsFolder import FitsFolder
 
 class CelebDataset(Dataset):
     def __init__(self, root_dir, source_table, transform=None, target_transform=None):
-        print("CelebDataset.__init__() will be invoked how many times?")
         self.root_dir = root_dir
         self.transform = transform
         self.target_transform = target_transform
