@@ -7,8 +7,9 @@ from astropy.io import fits
 from scipy import ndimage
 from torchvision.datasets import DatasetFolder, folder
 
-
 mask = np.ones((3, 3))
+
+IMG_ROOT = "images14"
 
 
 class FitsFolder(DatasetFolder):
@@ -32,14 +33,14 @@ class FitsFolder(DatasetFolder):
     def find_classes(self, directory: str) -> Tuple[List[List[str]], Dict[str, int]]:
         src_entries = self.T[130000:140000]
         self.types = src_entries['class']
-        img_folders = os.listdir('data/images14')
+        img_folders = os.listdir(IMG_ROOT)
 
         img_files = []
         for i in range(len(img_folders)):
             img_folder = img_folders[i]
             tmp = []
-            for f_name in os.listdir(os.path.join('data/images14', img_folder)):
-                img_path = os.path.join(os.path.join('data/images14', img_folder), f_name)
+            for f_name in os.listdir(os.path.join(IMG_ROOT, img_folder)):
+                img_path = os.path.join(os.path.join(IMG_ROOT, img_folder), f_name)
                 tmp.append(img_path)
             img_files.append(tmp)
 
@@ -56,7 +57,7 @@ class FitsFolder(DatasetFolder):
                      class_to_idx: Dict[str, int],
                      extensions: Optional[Tuple[str, ...]] = None,
                      is_valid_file: Optional[Callable[[str], bool]] = None,
-                     ) -> list[tuple[list[str], int]]:
+                     ) -> List[Tuple[List[str], int]]:
 
         if class_to_idx is None:
             # prevent potential bug since make_dataset() would use the class_to_idx logic of the
@@ -100,14 +101,7 @@ class FitsFolder(DatasetFolder):
             img_dat[:][:] = (img_dat[:][:] - vmin) / (vmax - vmin)
             return img_dat
 
-        # def fits_std(img_dat):
-        #     mean = np.mean(img_dat)
-        #     std = np.std(img_dat)
-        #     img_dat[:][:] = (img_dat[:][:] - mean) / std
-        #     return img_dat
-
         def dat_transform(raw_dat):
-            # std_dat = fits_std(raw_dat)
             norm_dat = fits_normalization(raw_dat)
             return norm_dat
 
