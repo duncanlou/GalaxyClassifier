@@ -113,25 +113,3 @@ def train_loop(trainloader, net, loss_fn, optimizer):
     print('Finished Training')
 
 
-def test_loop(dataloader, net, loss_fn):
-    net.eval()
-    size = len(dataloader.sampler)
-    num_batches = len(dataloader)
-    test_loss, correct = 0, 0
-
-    with torch.no_grad():
-        for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
-            pred = net(X)
-            test_loss += loss_fn(pred, y).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-
-    test_loss /= num_batches
-    correct /= size
-    print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
-
-
-for epoch in range(2):
-    running_loss = 0.0
-    train_loop(trainloader, model, loss_fn, optimizer, epoch)
-    test_loop(testloader, model, loss_fn)
