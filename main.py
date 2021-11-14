@@ -1,35 +1,42 @@
 import torch
-import torch.optim as optim
-import torchvision.utils
-from astropy.table import Table
 from torch import nn
-import torch.utils.data as data
-from torchvision import transforms
+import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+import torch.utils.data as data
+writer = SummaryWriter('runs/MyResearchProject_Duncan')
 
+import torchvision.utils
+from torchvision import transforms
+
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
+
+from astropy.table import Table
+
+# import from local project
+from utils import matplotlib_show_source_img, matplotlib_imshow
 from CelebDataset import CelebDataset
 from models.GalaxyNet import GalaxyNet
 import d2l
-from utils import matplotlib_imshow
 
-writer = SummaryWriter()
-T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")  # cost about 35 seconds
-
-tfs = transforms.Compose([
-    transforms.ToTensor(),
-    # transforms.Normalize((0.5,), (0.5,))
-])
-
-batch_size = 128
-number_labels = 3
-num_epochs = 10
 
 print(torch.__version__)
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Using {} device'.format(device))
 
-IMG_ROOT = "images14"
+T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")  # cost about 35 seconds
+IMG_ROOT = "data/images14"
+
+batch_size = 256
+num_class = 3
+num_epochs = 10
+
+
+tfs = transforms.Compose([
+    transforms.ToTensor(),
+])
+
 # 加载图像数据集，并在加载的时候对图像施加变换
 full_dataset = CelebDataset(IMG_ROOT, source_table=T, transform=tfs)
 
@@ -50,8 +57,19 @@ print("Test set size: ", test_set_size)
 loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
-dataiter = iter(trainloader)
+dataiter = iter(train_set)
 images, labels = dataiter.__next__()
+img_list = []
+for i in range(5):
+    img_list.append(images[i])
+img_grid = torchvision.utils.make_grid(img_list)
+matplotlib_imshow(img_grid, one_channel=True)
+matplotlib_show_source_img(images)
+
+
+
+# writer.add_graph(model)
+# writer.close()
 
 
 def evaluate_accuracy_gpu(net, dataloader, device=None):
@@ -72,7 +90,6 @@ def evaluate_accuracy_gpu(net, dataloader, device=None):
             y = y.to(device)
             metric.add(d2l.accuracy(net(X), y), y.numel())
     return metric[0] / metric[1]
-
 
 
 def train_loop(trainloader, net, loss_fn, optimizer):
@@ -113,3 +130,4 @@ def train_loop(trainloader, net, loss_fn, optimizer):
     print('Finished Training')
 
 
+train_loop(trainloader, model, loss_fn, optimizer)

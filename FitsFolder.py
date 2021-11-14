@@ -9,7 +9,7 @@ from torchvision.datasets import DatasetFolder, folder
 
 mask = np.ones((3, 3))
 
-IMG_ROOT = "images14"
+IMG_ROOT = "data/images14"
 
 
 class FitsFolder(DatasetFolder):
@@ -110,6 +110,7 @@ class FitsFolder(DatasetFolder):
         r_fits_dat = fits.getdata(images[2])
         y_fits_dat = fits.getdata(images[3])
         z_fits_dat = fits.getdata(images[4])
+
 
         dat = np.stack((g_fits_dat, i_fits_dat, r_fits_dat, y_fits_dat, z_fits_dat), axis=2)
         dat = dat_transform(dat)
