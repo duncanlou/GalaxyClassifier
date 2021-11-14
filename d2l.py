@@ -16,13 +16,15 @@ import time
 import zipfile
 from collections import defaultdict
 
+import matplotlib_inline
 import pandas as pd
 import requests
 from IPython import display
+
 from matplotlib import pyplot as plt
+import pylab
 
 d2l = sys.modules[__name__]
-
 
 # Defined in file: ./chapter_preface/index.md
 import numpy as np
@@ -98,6 +100,7 @@ def plot(X, Y=None, xlabel=None, ylabel=None, legend=None, xlim=None,
 # Defined in file: ./chapter_linear-networks/linear-regression.md
 class Timer:
     """Record multiple running times."""
+
     def __init__(self):
         self.times = []
         self.start()
@@ -142,7 +145,7 @@ def linreg(X, w, b):
 # Defined in file: ./chapter_linear-networks/linear-regression-scratch.md
 def squared_loss(y_hat, y):
     """Squared loss."""
-    return (y_hat - d2l.reshape(y, y_hat.shape))**2 / 2
+    return (y_hat - d2l.reshape(y, y_hat.shape)) ** 2 / 2
 
 
 # Defined in file: ./chapter_linear-networks/linear-regression-scratch.md
@@ -183,6 +186,7 @@ def show_images(imgs, num_rows, num_cols, titles=None, scale=1.5):
         else:
             # PIL Image
             ax.imshow(img)
+
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
         if titles:
@@ -242,6 +246,7 @@ def evaluate_accuracy(net, data_iter):
 # Defined in file: ./chapter_linear-networks/softmax-regression-scratch.md
 class Accumulator:
     """For accumulating sums over `n` variables."""
+
     def __init__(self, n):
         self.data = [0.0] * n
 
@@ -285,6 +290,7 @@ def train_epoch_ch3(net, train_iter, loss, updater):
 # Defined in file: ./chapter_linear-networks/softmax-regression-scratch.md
 class Animator:
     """For plotting data in animation."""
+
     def __init__(self, xlabel=None, ylabel=None, legend=None, xlim=None,
                  ylim=None, xscale='linear', yscale='linear',
                  fmts=('-', 'm--', 'g-.', 'r:'), nrows=1, ncols=1,
@@ -295,10 +301,10 @@ class Animator:
         d2l.use_svg_display()
         self.fig, self.axes = d2l.plt.subplots(nrows, ncols, figsize=figsize)
         if nrows * ncols == 1:
-            self.axes = [self.axes,]
+            self.axes = [self.axes, ]
         # Use a lambda function to capture arguments
         self.config_axes = lambda: d2l.set_axes(self.axes[
-            0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
+                                                    0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
         self.X, self.Y, self.fmts = None, None, fmts
 
     def add(self, x, y):
@@ -473,6 +479,7 @@ def evaluate_accuracy_gpu(net, data_iter, device=None):
 # Defined in file: ./chapter_convolutional-neural-networks/lenet.md
 def train_ch6(net, train_iter, test_iter, num_epochs, lr, device):
     """Train a model with a GPU (defined in Chapter 6)."""
+
     def init_weights(m):
         if type(m) == nn.Linear or type(m) == nn.Conv2d:
             nn.init.xavier_uniform_(m.weight)
@@ -516,6 +523,7 @@ def train_ch6(net, train_iter, test_iter, num_epochs, lr, device):
 # Defined in file: ./chapter_convolutional-modern/resnet.md
 class Residual(nn.Module):
     """The Residual block of ResNet."""
+
     def __init__(self, input_channels, num_channels, use_1x1conv=False,
                  strides=1):
         super().__init__()
@@ -566,6 +574,7 @@ def tokenize(lines, token='word'):
 # Defined in file: ./chapter_recurrent-neural-networks/text-preprocessing.md
 class Vocab:
     """Vocabulary for text."""
+
     def __init__(self, tokens=None, min_freq=0, reserved_tokens=None):
         if tokens is None:
             tokens = []
@@ -679,6 +688,7 @@ def seq_data_iter_sequential(corpus, batch_size, num_steps):
 # Defined in file: ./chapter_recurrent-neural-networks/language-models-and-dataset.md
 class SeqDataLoader:
     """An iterator to load sequence data."""
+
     def __init__(self, batch_size, num_steps, use_random_iter, max_tokens):
         if use_random_iter:
             self.data_iter_fn = d2l.seq_data_iter_random
@@ -703,6 +713,7 @@ def load_data_time_machine(batch_size, num_steps, use_random_iter=False,
 # Defined in file: ./chapter_recurrent-neural-networks/rnn-scratch.md
 class RNNModelScratch:
     """A RNN Model implemented from scratch."""
+
     def __init__(self, vocab_size, num_hiddens, device, get_params,
                  init_state, forward_fn):
         self.vocab_size, self.num_hiddens = vocab_size, num_hiddens
@@ -740,7 +751,7 @@ def grad_clipping(net, theta):
         params = [p for p in net.parameters() if p.requires_grad]
     else:
         params = net.params
-    norm = torch.sqrt(sum(torch.sum((p.grad**2)) for p in params))
+    norm = torch.sqrt(sum(torch.sum((p.grad ** 2)) for p in params))
     if norm > theta:
         for param in params:
             param.grad[:] *= theta / norm
@@ -811,6 +822,7 @@ def train_ch8(net, train_iter, vocab, lr, num_epochs, device,
 # Defined in file: ./chapter_recurrent-neural-networks/rnn-concise.md
 class RNNModel(nn.Module):
     """The RNN model."""
+
     def __init__(self, rnn_layer, vocab_size, **kwargs):
         super(RNNModel, self).__init__(**kwargs)
         self.rnn = rnn_layer
@@ -865,6 +877,7 @@ def read_data_nmt():
 # Defined in file: ./chapter_recurrent-modern/machine-translation-and-dataset.md
 def preprocess_nmt(text):
     """Preprocess the English-French dataset."""
+
     def no_space(char, prev_char):
         return char in set(',.!?') and prev_char != ' '
 
@@ -944,6 +957,7 @@ def load_data_nmt(batch_size, num_steps, num_examples=600):
 # Defined in file: ./chapter_recurrent-modern/encoder-decoder.md
 class Encoder(nn.Module):
     """The base encoder interface for the encoder-decoder architecture."""
+
     def __init__(self, **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
@@ -954,6 +968,7 @@ class Encoder(nn.Module):
 # Defined in file: ./chapter_recurrent-modern/encoder-decoder.md
 class Decoder(nn.Module):
     """The base decoder interface for the encoder-decoder architecture."""
+
     def __init__(self, **kwargs):
         super(Decoder, self).__init__(**kwargs)
 
@@ -967,6 +982,7 @@ class Decoder(nn.Module):
 # Defined in file: ./chapter_recurrent-modern/encoder-decoder.md
 class EncoderDecoder(nn.Module):
     """The base class for the encoder-decoder architecture."""
+
     def __init__(self, encoder, decoder, **kwargs):
         super(EncoderDecoder, self).__init__(**kwargs)
         self.encoder = encoder
@@ -981,6 +997,7 @@ class EncoderDecoder(nn.Module):
 # Defined in file: ./chapter_recurrent-modern/seq2seq.md
 class Seq2SeqEncoder(d2l.Encoder):
     """The RNN encoder for sequence to sequence learning."""
+
     def __init__(self, vocab_size, embed_size, num_hiddens, num_layers,
                  dropout=0, **kwargs):
         super(Seq2SeqEncoder, self).__init__(**kwargs)
@@ -1031,6 +1048,7 @@ class MaskedSoftmaxCELoss(nn.CrossEntropyLoss):
 # Defined in file: ./chapter_recurrent-modern/seq2seq.md
 def train_seq2seq(net, data_iter, lr, num_epochs, tgt_vocab, device):
     """Train a model for sequence to sequence."""
+
     def xavier_init_weights(m):
         if type(m) == nn.Linear:
             nn.init.xavier_uniform_(m.weight)
@@ -1135,6 +1153,7 @@ def show_heatmaps(matrices, xlabel, ylabel, titles=None, figsize=(2.5, 2.5),
     for i, (row_axes, row_matrices) in enumerate(zip(axes, matrices)):
         for j, (ax, matrix) in enumerate(zip(row_axes, row_matrices)):
             pcm = ax.imshow(d2l.numpy(matrix), cmap=cmap)
+
             if i == num_rows - 1:
                 ax.set_xlabel(xlabel)
             if j == 0:
@@ -1166,6 +1185,7 @@ def masked_softmax(X, valid_lens):
 # Defined in file: ./chapter_attention-mechanisms/attention-scoring-functions.md
 class AdditiveAttention(nn.Module):
     """Additive attention."""
+
     def __init__(self, key_size, query_size, num_hiddens, dropout, **kwargs):
         super(AdditiveAttention, self).__init__(**kwargs)
         self.W_k = nn.Linear(key_size, num_hiddens, bias=False)
@@ -1194,6 +1214,7 @@ class AdditiveAttention(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/attention-scoring-functions.md
 class DotProductAttention(nn.Module):
     """Scaled dot product attention."""
+
     def __init__(self, dropout, **kwargs):
         super(DotProductAttention, self).__init__(**kwargs)
         self.dropout = nn.Dropout(dropout)
@@ -1214,6 +1235,7 @@ class DotProductAttention(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/bahdanau-attention.md
 class AttentionDecoder(d2l.Decoder):
     """The base attention-based decoder interface."""
+
     def __init__(self, **kwargs):
         super(AttentionDecoder, self).__init__(**kwargs)
 
@@ -1225,6 +1247,7 @@ class AttentionDecoder(d2l.Decoder):
 # Defined in file: ./chapter_attention-mechanisms/multihead-attention.md
 class MultiHeadAttention(nn.Module):
     """Multi-head attention."""
+
     def __init__(self, key_size, query_size, value_size, num_hiddens,
                  num_heads, dropout, bias=False, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
@@ -1295,6 +1318,7 @@ def transpose_output(X, num_heads):
 # Defined in file: ./chapter_attention-mechanisms/self-attention-and-positional-encoding.md
 class PositionalEncoding(nn.Module):
     """Positional encoding."""
+
     def __init__(self, num_hiddens, dropout, max_len=1000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
@@ -1302,9 +1326,9 @@ class PositionalEncoding(nn.Module):
         self.P = d2l.zeros((1, max_len, num_hiddens))
         X = d2l.arange(max_len, dtype=torch.float32).reshape(
             -1, 1) / torch.pow(
-                10000,
-                torch.arange(0, num_hiddens, 2, dtype=torch.float32) /
-                num_hiddens)
+            10000,
+            torch.arange(0, num_hiddens, 2, dtype=torch.float32) /
+            num_hiddens)
         self.P[:, :, 0::2] = torch.sin(X)
         self.P[:, :, 1::2] = torch.cos(X)
 
@@ -1316,6 +1340,7 @@ class PositionalEncoding(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/transformer.md
 class PositionWiseFFN(nn.Module):
     """Positionwise feed-forward network."""
+
     def __init__(self, ffn_num_input, ffn_num_hiddens, ffn_num_outputs,
                  **kwargs):
         super(PositionWiseFFN, self).__init__(**kwargs)
@@ -1330,6 +1355,7 @@ class PositionWiseFFN(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/transformer.md
 class AddNorm(nn.Module):
     """Residual connection followed by layer normalization."""
+
     def __init__(self, normalized_shape, dropout, **kwargs):
         super(AddNorm, self).__init__(**kwargs)
         self.dropout = nn.Dropout(dropout)
@@ -1342,6 +1368,7 @@ class AddNorm(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/transformer.md
 class EncoderBlock(nn.Module):
     """Transformer encoder block."""
+
     def __init__(self, key_size, query_size, value_size, num_hiddens,
                  norm_shape, ffn_num_input, ffn_num_hiddens, num_heads,
                  dropout, use_bias=False, **kwargs):
@@ -1362,6 +1389,7 @@ class EncoderBlock(nn.Module):
 # Defined in file: ./chapter_attention-mechanisms/transformer.md
 class TransformerEncoder(d2l.Encoder):
     """Transformer encoder."""
+
     def __init__(self, vocab_size, key_size, query_size, value_size,
                  num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens,
                  num_heads, num_layers, dropout, use_bias=False, **kwargs):
@@ -1504,6 +1532,7 @@ def train_concise_ch11(trainer_fn, hyperparams, data_iter, num_epochs=4):
 # Defined in file: ./chapter_computational-performance/hybridize.md
 class Benchmark:
     """For measuring running time."""
+
     def __init__(self, description='Done'):
         self.description = description
 
@@ -1525,6 +1554,7 @@ def split_batch(X, y, devices):
 # Defined in file: ./chapter_computational-performance/multiple-gpus-concise.md
 def resnet18(num_classes, in_channels=1):
     """A slightly modified ResNet-18 model."""
+
     def resnet_block(in_channels, out_channels, num_residuals,
                      first_block=False):
         blk = []
@@ -1664,8 +1694,8 @@ def multibox_prior(data, sizes, ratios):
     # Generate `boxes_per_pixel` number of heights and widths that are later
     # used to create anchor box corner coordinates (xmin, xmax, ymin, ymax)
     w = torch.cat((size_tensor * torch.sqrt(ratio_tensor[0]),
-                   sizes[0] * torch.sqrt(ratio_tensor[1:])))\
-                   * in_height / in_width  # Handle rectangular inputs
+                   sizes[0] * torch.sqrt(ratio_tensor[1:]))) \
+        * in_height / in_width  # Handle rectangular inputs
     h = torch.cat((size_tensor / torch.sqrt(ratio_tensor[0]),
                    sizes[0] / torch.sqrt(ratio_tensor[1:])))
     # Divide by 2 to get half height and half width
@@ -1683,6 +1713,7 @@ def multibox_prior(data, sizes, ratios):
 # Defined in file: ./chapter_computer-vision/anchor.md
 def show_bboxes(axes, bboxes, labels=None, colors=None):
     """Show bounding boxes."""
+
     def make_list(obj, default_values=None):
         if obj is None:
             obj = default_values
@@ -1890,6 +1921,7 @@ def read_data_bananas(is_train=True):
 # Defined in file: ./chapter_computer-vision/object-detection-dataset.md
 class BananasDataset(torch.utils.data.Dataset):
     """A customized dataset to load the banana detection dataset."""
+
     def __init__(self, is_train):
         self.features, self.labels = read_data_bananas(is_train)
         print('read ' + str(len(self.features)) + (
@@ -1954,7 +1986,7 @@ VOC_CLASSES = [
 # Defined in file: ./chapter_computer-vision/semantic-segmentation-and-dataset.md
 def voc_colormap2label():
     """Build the mapping from RGB to class indices for VOC labels."""
-    colormap2label = torch.zeros(256**3, dtype=torch.long)
+    colormap2label = torch.zeros(256 ** 3, dtype=torch.long)
     for i, colormap in enumerate(VOC_COLORMAP):
         colormap2label[(colormap[0] * 256 + colormap[1]) * 256 +
                        colormap[2]] = i
@@ -1982,6 +2014,7 @@ def voc_rand_crop(feature, label, height, width):
 # Defined in file: ./chapter_computer-vision/semantic-segmentation-and-dataset.md
 class VOCSegDataset(torch.utils.data.Dataset):
     """A customized dataset to load the VOC dataset."""
+
     def __init__(self, is_train, crop_size, voc_dir):
         self.transform = torchvision.transforms.Normalize(
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -2087,7 +2120,6 @@ def reorg_test(data_dir):
 d2l.DATA_HUB['dog_tiny'] = (d2l.DATA_URL + 'kaggle_dog_tiny.zip',
                             '0cb91d09b814ecdc07b50f31f8dcad3e81d6a86d')
 
-
 # Defined in file: ./chapter_natural-language-processing-pretraining/word-embedding-dataset.md
 d2l.DATA_HUB['ptb'] = (d2l.DATA_URL + 'ptb.zip',
                        '319d85e578af0cdc590547f26231e4e31cdf1e42')
@@ -2144,6 +2176,7 @@ def get_centers_and_contexts(corpus, max_window_size):
 # Defined in file: ./chapter_natural-language-processing-pretraining/word-embedding-dataset.md
 class RandomGenerator:
     """Randomly draw among {1, ..., n} according to n sampling weights."""
+
     def __init__(self, sampling_weights):
         # Exclude
         self.population = list(range(1, len(sampling_weights) + 1))
@@ -2167,7 +2200,7 @@ def get_negatives(all_contexts, vocab, counter, K):
     # Sampling weights for words with indices 1, 2, ... (index 0 is the
     # excluded unknown token) in the vocabulary
     sampling_weights = [
-        counter[vocab.to_tokens(i)]**0.75 for i in range(1, len(vocab))]
+        counter[vocab.to_tokens(i)] ** 0.75 for i in range(1, len(vocab))]
     all_negatives, generator = [], RandomGenerator(sampling_weights)
     for contexts in all_contexts:
         negatives = []
@@ -2248,6 +2281,7 @@ d2l.DATA_HUB['wiki.en'] = (d2l.DATA_URL + 'wiki.en.zip',
 # Defined in file: ./chapter_natural-language-processing-pretraining/similarity-analogy.md
 class TokenEmbedding:
     """Token Embedding."""
+
     def __init__(self, embedding_name):
         self.idx_to_token, self.idx_to_vec = self._load_embedding(
             embedding_name)
@@ -2297,6 +2331,7 @@ def get_tokens_and_segments(tokens_a, tokens_b=None):
 # Defined in file: ./chapter_natural-language-processing-pretraining/bert.md
 class BERTEncoder(nn.Module):
     """BERT encoder."""
+
     def __init__(self, vocab_size, num_hiddens, norm_shape, ffn_num_input,
                  ffn_num_hiddens, num_heads, num_layers, dropout,
                  max_len=1000, key_size=768, query_size=768, value_size=768,
@@ -2329,6 +2364,7 @@ class BERTEncoder(nn.Module):
 # Defined in file: ./chapter_natural-language-processing-pretraining/bert.md
 class MaskLM(nn.Module):
     """The masked language model task of BERT."""
+
     def __init__(self, vocab_size, num_hiddens, num_inputs=768, **kwargs):
         super(MaskLM, self).__init__(**kwargs)
         self.mlp = nn.Sequential(nn.Linear(num_inputs, num_hiddens),
@@ -2352,6 +2388,7 @@ class MaskLM(nn.Module):
 # Defined in file: ./chapter_natural-language-processing-pretraining/bert.md
 class NextSentencePred(nn.Module):
     """The next sentence prediction task of BERT."""
+
     def __init__(self, num_inputs, **kwargs):
         super(NextSentencePred, self).__init__(**kwargs)
         self.output = nn.Linear(num_inputs, 2)
@@ -2364,6 +2401,7 @@ class NextSentencePred(nn.Module):
 # Defined in file: ./chapter_natural-language-processing-pretraining/bert.md
 class BERTModel(nn.Module):
     """The BERT model."""
+
     def __init__(self, vocab_size, num_hiddens, norm_shape, ffn_num_input,
                  ffn_num_hiddens, num_heads, num_layers, dropout,
                  max_len=1000, key_size=768, query_size=768, value_size=768,
@@ -2582,8 +2620,8 @@ def _get_batch_loss_bert(net, loss, vocab_size, tokens_X, segments_X,
     _, mlm_Y_hat, nsp_Y_hat = net(tokens_X, segments_X,
                                   valid_lens_x.reshape(-1), pred_positions_X)
     # Compute masked language model loss
-    mlm_l = loss(mlm_Y_hat.reshape(-1, vocab_size), mlm_Y.reshape(-1)) *\
-    mlm_weights_X.reshape(-1, 1)
+    mlm_l = loss(mlm_Y_hat.reshape(-1, vocab_size), mlm_Y.reshape(-1)) * \
+            mlm_weights_X.reshape(-1, 1)
     mlm_l = mlm_l.sum() / (mlm_weights_X.sum() + 1e-8)
     # Compute next sentence prediction loss
     nsp_l = loss(nsp_Y_hat, nsp_y)
@@ -2650,6 +2688,7 @@ d2l.DATA_HUB['SNLI'] = ('https://nlp.stanford.edu/projects/snli/snli_1.0.zip',
 # Defined in file: ./chapter_natural-language-processing-applications/natural-language-inference-and-dataset.md
 def read_snli(data_dir, is_train):
     """Read the SNLI dataset into premises, hypotheses, and labels."""
+
     def extract_text(s):
         # Remove information that will not be used by us
         s = re.sub('\\(', '', s)
@@ -2672,6 +2711,7 @@ def read_snli(data_dir, is_train):
 # Defined in file: ./chapter_natural-language-processing-applications/natural-language-inference-and-dataset.md
 class SNLIDataset(torch.utils.data.Dataset):
     """A customized dataset to load the SNLI dataset."""
+
     def __init__(self, dataset, num_steps, vocab=None):
         self.num_steps = num_steps
         all_premise_tokens = d2l.tokenize(dataset[0])
@@ -2726,7 +2766,7 @@ def predict_snli(net, vocab, premise, hypothesis):
         net([premise.reshape((1, -1)),
              hypothesis.reshape((1, -1))]), dim=1)
     return 'entailment' if label == 0 else 'contradiction' if label == 1 \
-            else 'neutral'
+        else 'neutral'
 
 
 # Defined in file: ./chapter_generative-adversarial-networks/gan.md
@@ -2768,7 +2808,6 @@ def update_G(Z, net_D, net_G, loss, trainer_G):
 d2l.DATA_HUB['pokemon'] = (d2l.DATA_URL + 'pokemon.zip',
                            'c065c0e2593b8b161a2d7873e42418bf6a21106c')
 
-
 # Alias defined in config.ini
 
 
@@ -2802,4 +2841,3 @@ reduce_sum = lambda x, *args, **kwargs: x.sum(*args, **kwargs)
 argmax = lambda x, *args, **kwargs: x.argmax(*args, **kwargs)
 astype = lambda x, *args, **kwargs: x.type(*args, **kwargs)
 transpose = lambda x, *args, **kwargs: x.t(*args, **kwargs)
-
