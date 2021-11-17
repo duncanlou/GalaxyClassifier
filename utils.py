@@ -1,6 +1,7 @@
 from matplotlib import colors
 import matplotlib.pyplot as plt
 import numpy as np
+from ray import cloudpickle as pickle
 
 
 def matplotlib_imshow(img, one_channel=False):
@@ -52,3 +53,12 @@ def matplotlib_show_source_img(img):
 def get_score(model, X_train, X_test, y_train, y_test):
     model.fit(X_train, y_train)
     return model.score(X_test, y_test)
+
+
+
+
+
+def measure_hyper_param_size(xgboost_hyper_param):
+    pickled = pickle.dumps(xgboost_hyper_param)
+    length_mib = len(pickled) // (1024 * 1024)
+    print(length_mib)
