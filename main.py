@@ -1,5 +1,4 @@
 import os
-from functools import partial
 
 import numpy as np
 
@@ -12,6 +11,7 @@ from torch.utils.data import DataLoader, random_split
 import torchvision.utils
 from torchvision import transforms
 
+import ray
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
@@ -19,45 +19,53 @@ from ray.tune.schedulers import ASHAScheduler
 from astropy.table import Table
 
 # import from local project
-from utils import matplotlib_show_source_img, matplotlib_imshow
+from utils import matplotlib_show_source_img, matplotlib_imshow, measure_hyper_param_size
 from CelebDataset import CelebDataset
 from models.GalaxyNet import GalaxyNet
 import d2l
 
 print(torch.__version__)
-writer = SummaryWriter('runs/MyResearchProject_Duncan')
+# writer = SummaryWriter('logs')
 
+T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")
+IMG_DIR = "./images14"
 
 # writer.add_graph(model)
 # writer.close()
 
-def load_data(data_dir="./images14"):
-    T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")
-    tfs = transforms.Compose([
-        transforms.ToTensor(),
-        # transforms.CenterCrop(224)
-    ])
+
+tfs = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.CenterCrop(224)
+])
+
+
+def load_data(data_dir=IMG_DIR):
     # 加载图像数据集，并在加载的时候对图像施加变换
-    full_dataset = CelebDataset(data_dir, source_table=T, transform=tfs)
+    full_dataset = CelebDataset(IMG_DIR, source_table=T, transform=tfs)
 
     train_set_size = int(len(full_dataset) * 0.8)
-    test_set_size = len(full_dataset) - train_set_size
-    train_set, test_set = random_split(full_dataset, [train_set_size, test_set_size])
+    validation_set_size = int(len(full_dataset) * 0.1)
+    test_set_size = len(full_dataset) - train_set_size - validation_set_size
+    train_set, validation_set, test_set = random_split(full_dataset,
+                                                       [train_set_size, validation_set_size, test_set_size])
 
     print("Full set size:", len(full_dataset))
     print("Train set size: ", train_set_size)
+    print("Validation set size: ", validation_set_size)
     print("Test set size: ", test_set_size)
 
-    dataiter = iter(train_set)
-    images, labels = dataiter.__next__()
-    img_list = []
-    for i in range(5):
-        img_list.append(images[i])
-    img_grid = torchvision.utils.make_grid(img_list)
-    matplotlib_imshow(img_grid, one_channel=True)
-    matplotlib_show_source_img(images)
+    return train_set, validation_set, test_set
 
-    return train_set, test_set
+
+# dataiter = iter(train_set)
+# images, labels = dataiter.__next__()
+# img_list = []
+# for i in range(5):
+#     img_list.append(images[i])
+# img_grid = torchvision.utils.make_grid(img_list)
+# matplotlib_imshow(img_grid, one_channel=True)
+# matplotlib_show_source_img(images)
 
 
 # the accuracy on test set (not validation set!)
@@ -70,9 +78,10 @@ def test_accuracy(net, device=None):
     # No. of correct predictions, no. of predictions
     metric = d2l.Accumulator(2)
 
-    trainset, testset = load_data()
+    _, _, test_set = load_data()
+
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=4, shuffle=False, num_workers=2)
+        test_set, batch_size=4, shuffle=False, num_workers=2)
 
     with torch.no_grad():
         for X, y in testloader:
@@ -87,7 +96,7 @@ def test_accuracy(net, device=None):
     return metric[0] / metric[1]
 
 
-def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
+def train_source_classifier(config, data, checkpoint_dir=None):
     net = GalaxyNet(config["l1"], config["l2"])
 
     device = 'cpu'
@@ -106,22 +115,19 @@ def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
         net.load_state_dict(model_state)
         optimizer.load_state_dict(optimizer_state)
 
-    trainset, testset = load_data(data_dir)
-    train_subset_size = int(len(trainset) * 0.8)
-    train_subset, val_subset = random_split(trainset, [train_subset_size, len(trainset) - train_subset_size])
-
+    trainset, validset, _ = data
     trainloader = DataLoader(
-        train_subset,
+        trainset,
         batch_size=int(config["batch_size"]),
         shuffle=True,
-        num_workers=8
+        num_workers=0
     )
 
     valloader = DataLoader(
-        val_subset,
+        validset,
         batch_size=int(config["batch_size"]),
         shuffle=True,
-        num_workers=8
+        num_workers=0
     )
 
     animator = d2l.Animator(xlabel='epoch', xlim=[1, 10], legend=['train loss', 'train_acc', 'test acc'])
@@ -132,7 +138,7 @@ def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         metric = d2l.Accumulator(3)
         net.train()
-        for i, (X, y) in enumerate(trainloader, 0):
+        for i, (X, y) in enumerate(trainloader):
             timer.start()
 
             X, y = X.to(device), y.to(device)
@@ -157,7 +163,7 @@ def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
         val_steps = 0
         total = 0
         correct = 0
-        for i, data in enumerate(valloader, 0):
+        for i, data in enumerate(valloader):
             with torch.no_grad():
                 images, labels = data
                 images, labels = images.to(device), labels.to(device)
@@ -180,7 +186,6 @@ def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
 
         animator.add(epoch + 1, (None, None, val_acc))
 
-
     print(f'loss {train_l:.3f}, train acc {train_acc * 100:.5f}%, ' f'test acc {val_acc * 100:.5f}%')
     print(f'{metric[2] * num_epochs / timer.sum():.1f} examples/sec ' f'on {str(device)}')
 
@@ -188,8 +193,6 @@ def train_source_classifier(config, checkpoint_dir=None, data_dir=None):
 
 
 def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
-    data_dir = os.path.abspath("./images14")
-    load_data(data_dir)
     config = {
         # the l1 and l2 parameters should be powers of 2 between 4 and 256, so either 4, 8, 16, 32, 64, 128, or 256
         "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
@@ -197,8 +200,7 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
         # The lr (learning rate) should be uniformly sampled between 0.0001 and 0.1
         "lr": tune.loguniform(1e-4, 1e-1),
         # the batch size is a choice between 8, 16, 32, 64, 128, 256 and 512.
-        "batch_size": tune.choice([8, 16, 32, 64, 128, 256, 512])
-
+        "batch_size": tune.choice([8, 16, 32, 64, 128, 256, 512]),
     }
 
     # ASHAScheduler will terminate bad performing trials early
@@ -214,14 +216,14 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
         # parametre_columns=["l1", "l2", "lr", "batch_size"],
         metric_columns=["loss", "accuracy", "training_iteration"]
     )
+
     result = tune.run(
-        partial(train_source_classifier, data_dir=data_dir),
+        tune.with_parameters(train_source_classifier, data=load_data()),
         resources_per_trial={"cpu": 8, "gpu": gpus_per_trial},
         config=config,
         num_samples=num_samples,
         scheduler=scheduler,
-        progress_reporter=reporter,
-        checkpoint_at_end=True
+        progress_reporter=reporter
     )
     best_trial = result.get_best_trial("loss", "min", "last")
     print("Best trial config: {}".format(best_trial.config))
@@ -245,4 +247,4 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
 
 
 if __name__ == "__main__":
-    main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5)
+    main(num_samples=10, max_num_epochs=10, gpus_per_trial=0)

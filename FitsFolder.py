@@ -1,15 +1,40 @@
 import os
-import shutil
 from typing import Tuple, Dict, List, Optional, Callable, cast
 
 import numpy as np
+import copy
 from astropy.io import fits
-from scipy import ndimage
+from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
+
 from torchvision.datasets import DatasetFolder, folder
 
-mask = np.ones((3, 3))
+IMG_ROOT = "/Users/loukangzhi/PycharmProjects/GalaxyClassifier/images14"
 
-IMG_ROOT = "data/images14"
+
+def filter_dataset(sources):
+    sources_copy = copy.deepcopy(sources)
+
+    for source in sources:
+        for j in range(5):
+            try:
+                fits_dat = fits.getdata(source[j])
+                row, col = np.where(np.isnan(fits_dat))
+                if len(row) >= 100:  # if missing values pixels number is larger than 100, skip this image
+                    path_n_arr = source[j].split(os.path.sep)
+                    fits_n = path_n_arr[-3] + os.path.sep + path_n_arr[-2] + os.path.sep + path_n_arr[-1]
+                    print(f"{len(row)} NaN values are found in: {fits_n}")
+                    sources_copy.remove(source)
+                    break
+            except OSError as err:
+                path_n_arr = source[j].split(os.path.sep)
+                fits_n = path_n_arr[-3] + os.path.sep + path_n_arr[-2] + os.path.sep + path_n_arr[-1]
+                print(f"invalid fits file: {fits_n}, error: {err}")
+        else:
+            pass
+
+    diff = len(sources) - len(sources_copy)
+    print(f"Altogether {diff} bad sources from total {len(sources)} sources have been removed")
+    return sources_copy
 
 
 class FitsFolder(DatasetFolder):
@@ -83,6 +108,8 @@ class FitsFolder(DatasetFolder):
 
         instances = []
 
+        src_files = filter_dataset(src_files)
+
         for idx, img_f in enumerate(src_files):
             item = img_f, class_to_idx[self.types[idx]]
             instances.append(item)
@@ -90,9 +117,12 @@ class FitsFolder(DatasetFolder):
         return instances
 
     @staticmethod
-    def __fits_loader(images):
-        if len(images) != 5:
-            print(images)
+    def __fits_loader(multichannel_fits):
+        multichannel_fits.sort()
+        kernel = Gaussian2DKernel(x_stddev=1)
+
+        if len(multichannel_fits) != 5:
+            print(multichannel_fits)
             raise IndexError
 
         def fits_normalization(img_dat):
@@ -101,18 +131,11 @@ class FitsFolder(DatasetFolder):
             img_dat[:][:] = (img_dat[:][:] - vmin) / (vmax - vmin)
             return img_dat
 
-        def dat_transform(raw_dat):
-            norm_dat = fits_normalization(raw_dat)
-            return norm_dat
+        for i in range(5):
+            img_dat = fits.getdata(multichannel_fits[i])
+            multichannel_fits[i] = interpolate_replace_nans(img_dat, kernel)
 
-        g_fits_dat = fits.getdata(images[0])
-        i_fits_dat = fits.getdata(images[1])
-        r_fits_dat = fits.getdata(images[2])
-        y_fits_dat = fits.getdata(images[3])
-        z_fits_dat = fits.getdata(images[4])
-
-
-        dat = np.stack((g_fits_dat, i_fits_dat, r_fits_dat, y_fits_dat, z_fits_dat), axis=2)
-        dat = dat_transform(dat)
+        dat = np.stack(multichannel_fits, axis=2)
+        dat = fits_normalization(dat)
 
         return dat
