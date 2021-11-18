@@ -16,18 +16,17 @@ def filter_dataset(sources):
 
     for source in sources:
         for j in range(5):
+            path_levels_arr = source[j].split(os.path.sep)
             try:
                 fits_dat = fits.getdata(source[j])
                 row, col = np.where(np.isnan(fits_dat))
                 if len(row) >= 100:  # if missing values pixels number is larger than 100, skip this image
-                    path_n_arr = source[j].split(os.path.sep)
-                    fits_n = path_n_arr[-3] + os.path.sep + path_n_arr[-2] + os.path.sep + path_n_arr[-1]
+                    fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
                     print(f"{len(row)} NaN values are found in: {fits_n}")
                     sources_copy.remove(source)
                     break
             except OSError as err:
-                path_n_arr = source[j].split(os.path.sep)
-                fits_n = path_n_arr[-3] + os.path.sep + path_n_arr[-2] + os.path.sep + path_n_arr[-1]
+                fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
                 print(f"invalid fits file: {fits_n}, error: {err}")
         else:
             pass
@@ -126,16 +125,17 @@ class FitsFolder(DatasetFolder):
             raise IndexError
 
         def fits_normalization(img_dat):
+            # img_dat.shape：(240, 240, 5)
             vmax = np.max(img_dat)
             vmin = np.min(img_dat)
-            img_dat[:][:] = (img_dat[:][:] - vmin) / (vmax - vmin)
-            return img_dat
+            img_dat[:, :, :] = (img_dat - vmin) / (vmax - vmin)
+
 
         for i in range(5):
             img_dat = fits.getdata(multichannel_fits[i])
             multichannel_fits[i] = interpolate_replace_nans(img_dat, kernel)
 
         dat = np.stack(multichannel_fits, axis=2)
-        dat = fits_normalization(dat)
+        fits_normalization(dat)
 
         return dat

@@ -24,7 +24,7 @@ from CelebDataset import CelebDataset
 from models.GalaxyNet import GalaxyNet
 import d2l
 
-print(torch.__version__)
+print("torch version: ", torch.__version__)
 # writer = SummaryWriter('logs')
 
 T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")
