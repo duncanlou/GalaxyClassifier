@@ -1,5 +1,6 @@
 import os
 from typing import Tuple, Dict, List, Optional, Callable, cast
+import shutil
 
 import numpy as np
 import copy
@@ -8,7 +9,7 @@ from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
 
 from torchvision.datasets import DatasetFolder, folder
 
-IMG_ROOT = "/Users/loukangzhi/PycharmProjects/GalaxyClassifier/images14"
+kernel = Gaussian2DKernel(x_stddev=1)
 
 
 def filter_dataset(sources):
@@ -20,14 +21,18 @@ def filter_dataset(sources):
             try:
                 fits_dat = fits.getdata(source[j])
                 row, col = np.where(np.isnan(fits_dat))
-                if len(row) >= 100:  # if missing values pixels number is larger than 100, skip this image
+                if len(row) >= 50:  # if missing values pixels number is larger than 100, skip this image
                     fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
                     print(f"{len(row)} NaN values are found in: {fits_n}")
                     sources_copy.remove(source)
+                    shutil.rmtree(path_levels_arr[-3] + os.path.sep + path_levels_arr[-2])
                     break
             except OSError as err:
                 fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
                 print(f"invalid fits file: {fits_n}, error: {err}")
+                sources_copy.remove(source)
+                shutil.rmtree(path_levels_arr[-3] + os.path.sep + path_levels_arr[-2])
+                break
         else:
             pass
 
@@ -42,39 +47,15 @@ class FitsFolder(DatasetFolder):
     def __init__(
             self,
             root: str,
-            data_table,
             transform=None,
             target_transform=None,
             loader=None,
     ):
-        self.T = data_table
         if loader is None:
             loader = self.__fits_loader
         super(FitsFolder, self).__init__(root, loader, self.EXTENSIONS,
                                          transform=transform,
                                          target_transform=target_transform)
-
-    def find_classes(self, directory: str) -> Tuple[List[List[str]], Dict[str, int]]:
-        src_entries = self.T[130000:140000]
-        self.types = src_entries['class']
-        img_folders = os.listdir(IMG_ROOT)
-
-        img_files = []
-        for i in range(len(img_folders)):
-            img_folder = img_folders[i]
-            tmp = []
-            for f_name in os.listdir(os.path.join(IMG_ROOT, img_folder)):
-                img_path = os.path.join(os.path.join(IMG_ROOT, img_folder), f_name)
-                tmp.append(img_path)
-            img_files.append(tmp)
-
-        class_type_mappings = {
-            'GALAXY': 0,
-            'QSO': 1,
-            'STAR': 2
-        }
-
-        return img_files, class_type_mappings
 
     def make_dataset(self,
                      directory: str,
@@ -82,17 +63,20 @@ class FitsFolder(DatasetFolder):
                      extensions: Optional[Tuple[str, ...]] = None,
                      is_valid_file: Optional[Callable[[str], bool]] = None,
                      ) -> List[Tuple[List[str], int]]:
+        """Generates a list of samples of a form (path_to_sample, class).
 
+            See :class:`DatasetFolder` for details.
+
+            Note: The class_to_idx parameter is here optional and will use the logic of the ``find_classes`` function
+            by default.
+        """
+        directory = os.path.join(os.getcwd(), directory)
+
+        # Ensure that class_to_idx is neither none nor empty.
         if class_to_idx is None:
-            # prevent potential bug since make_dataset() would use the class_to_idx logic of the
-            # find_classes() function, instead of using that of the find_classes() method, which
-            # is potentially overridden and thus could have a different logic.
-            raise ValueError(
-                "The class_to_idx parameter cannot be None."
-            )
-        directory = os.path.expanduser(directory)
-
-        src_files, _ = self.find_classes(directory)
+            _, class_to_idx = self.find_classes(directory)
+        elif not class_to_idx:
+            raise ValueError("'class_to_index' must have at least one entry to collect any samples.")
 
         both_none = extensions is None and is_valid_file is None
         both_something = extensions is not None and is_valid_file is not None
@@ -106,19 +90,42 @@ class FitsFolder(DatasetFolder):
         is_valid_file = cast(Callable[[str], bool], is_valid_file)
 
         instances = []
+        available_classes = set()
 
-        src_files = filter_dataset(src_files)
+        for target_class in sorted(class_to_idx.keys()):
+            class_index = class_to_idx[target_class]
+            target_dir = os.path.join(directory, target_class)
+            if not os.path.isdir(target_dir):  # if target_dir is a file, then skip it
+                continue
+            for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
+                if len(fnames) == 5:
+                    fits_in_a_source = []
+                    for fname in sorted(fnames):
+                        path = os.path.join(root, fname)
+                        if is_valid_file(path):
+                            fits_in_a_source.append(path)
+                            if target_class not in available_classes:
+                                available_classes.add(target_class)
+                    item = fits_in_a_source, class_index
+                    instances.append(item)
 
-        for idx, img_f in enumerate(src_files):
-            item = img_f, class_to_idx[self.types[idx]]
-            instances.append(item)
+        empty_classes = set(class_to_idx.keys()) - available_classes
+        if empty_classes:
+            msg = f"Found no valid file for the classes {', '.join(sorted(empty_classes))}. "
+            if extensions is not None:
+                msg += f"Supported extensions are: {', '.join(extensions)}"
+            raise FileNotFoundError(msg)
 
         return instances
+
+
+
+
+
 
     @staticmethod
     def __fits_loader(multichannel_fits):
         multichannel_fits.sort()
-        kernel = Gaussian2DKernel(x_stddev=1)
 
         if len(multichannel_fits) != 5:
             print(multichannel_fits)
@@ -129,7 +136,6 @@ class FitsFolder(DatasetFolder):
             vmax = np.max(img_dat)
             vmin = np.min(img_dat)
             img_dat[:, :, :] = (img_dat - vmin) / (vmax - vmin)
-
 
         for i in range(5):
             img_dat = fits.getdata(multichannel_fits[i])
