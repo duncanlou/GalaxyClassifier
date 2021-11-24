@@ -1,9 +1,8 @@
 import os
 from typing import Tuple, Dict, List, Optional, Callable, cast
-import shutil
 
 import numpy as np
-import copy
+
 from astropy.io import fits
 from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
 
@@ -12,33 +11,21 @@ from torchvision.datasets import DatasetFolder, folder
 kernel = Gaussian2DKernel(x_stddev=1)
 
 
-def filter_dataset(sources):
-    sources_copy = copy.deepcopy(sources)
-
-    for source in sources:
-        for j in range(5):
-            path_levels_arr = source[j].split(os.path.sep)
-            try:
-                fits_dat = fits.getdata(source[j])
-                row, col = np.where(np.isnan(fits_dat))
-                if len(row) >= 50:  # if missing values pixels number is larger than 100, skip this image
-                    fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
-                    print(f"{len(row)} NaN values are found in: {fits_n}")
-                    sources_copy.remove(source)
-                    shutil.rmtree(path_levels_arr[-3] + os.path.sep + path_levels_arr[-2])
-                    break
-            except OSError as err:
-                fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
-                print(f"invalid fits file: {fits_n}, error: {err}")
-                sources_copy.remove(source)
-                shutil.rmtree(path_levels_arr[-3] + os.path.sep + path_levels_arr[-2])
-                break
+def filter_dataset(fits_path):
+    path_levels_arr = fits_path.split(os.path.sep)
+    try:
+        single_channel_fits_dat = fits.getdata(fits_path)
+        row, col = np.where(np.isnan(single_channel_fits_dat))
+        fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
+        print(f"{len(row)} NaN values are found in: {fits_n}")
+        if len(row) >= 50:  # if missing values pixels number is larger than 100, skip this image
+            return None
         else:
-            pass
-
-    diff = len(sources) - len(sources_copy)
-    print(f"Altogether {diff} bad sources from total {len(sources)} sources have been removed")
-    return sources_copy
+            return interpolate_replace_nans(single_channel_fits_dat, kernel)
+    except OSError as err:
+        fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
+        print(f"invalid fits file: {fits_n}, error: {err}")
+        return None
 
 
 class FitsFolder(DatasetFolder):
@@ -97,17 +84,22 @@ class FitsFolder(DatasetFolder):
             target_dir = os.path.join(directory, target_class)
             if not os.path.isdir(target_dir):  # if target_dir is a file, then skip it
                 continue
-            for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
-                if len(fnames) == 5:
-                    fits_in_a_source = []
-                    for fname in sorted(fnames):
-                        path = os.path.join(root, fname)
-                        if is_valid_file(path):
-                            fits_in_a_source.append(path)
-                            if target_class not in available_classes:
-                                available_classes.add(target_class)
-                    item = fits_in_a_source, class_index
+            for root, dirnames, fnames in sorted(os.walk(target_dir, followlinks=True)):  # I don't quite understand 'os.walk' this API, need to study it
+                single_source_img_dat = []
+                for fname in sorted(fnames):  # for...else...    (tomorrow to solve it)
+                    path = os.path.join(root, fname)
+                    if is_valid_file(path):
+                        one_channal_img_dat = filter_dataset(path)
+                        if one_channal_img_dat is None:  # drop all the 5 fits file
+                            break
+                        single_source_img_dat.append(one_channal_img_dat)
+                        if target_class not in available_classes:
+                            available_classes.add(target_class)
+                if len(single_source_img_dat) == 5:
+                    dat = np.stack(single_source_img_dat, axis=2)
+                    item = dat, class_index
                     instances.append(item)
+
 
         empty_classes = set(class_to_idx.keys()) - available_classes
         if empty_classes:
@@ -118,30 +110,11 @@ class FitsFolder(DatasetFolder):
 
         return instances
 
-
-
-
-
-
     @staticmethod
-    def __fits_loader(multichannel_fits):
-        multichannel_fits.sort()
+    def __fits_loader(img_dat):
+        vmax = np.max(img_dat)
+        vmin = np.min(img_dat)
+        img_dat[:, :, :] = (img_dat - vmin) / (vmax - vmin)
 
-        if len(multichannel_fits) != 5:
-            print(multichannel_fits)
-            raise IndexError
+        return img_dat
 
-        def fits_normalization(img_dat):
-            # img_dat.shape：(240, 240, 5)
-            vmax = np.max(img_dat)
-            vmin = np.min(img_dat)
-            img_dat[:, :, :] = (img_dat - vmin) / (vmax - vmin)
-
-        for i in range(5):
-            img_dat = fits.getdata(multichannel_fits[i])
-            multichannel_fits[i] = interpolate_replace_nans(img_dat, kernel)
-
-        dat = np.stack(multichannel_fits, axis=2)
-        fits_normalization(dat)
-
-        return dat
