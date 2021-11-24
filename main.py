@@ -25,6 +25,8 @@ from models.GalaxyNet import GalaxyNet
 import d2l
 
 print("torch version: ", torch.__version__)
+np.random.seed(42)
+torch.manual_seed(42)
 src_root_path = os.path.join(os.getcwd(), "data/sources")  # galaxy: 7509; quasar: 738; star: 990
 
 
@@ -34,7 +36,11 @@ def make_datasets_sampler(dataset):
     weight = 1. / class_sample_count
     samples_weight = weight[targets]
     samples_weight = torch.from_numpy(samples_weight)
-    sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+    sampler = WeightedRandomSampler(
+        weights=samples_weight,
+        num_samples=len(samples_weight),
+        replacement=True
+    )
     return sampler
 
 
@@ -117,7 +123,7 @@ def train_source_classifier(data, checkpoint_dir=None):
         trainset,
         # batch_size=int(config["batch_size"]),
         batch_size=64,
-        num_workers=0,
+        num_workers=2,
         sampler=train_sampler
     )
 
@@ -128,7 +134,7 @@ def train_source_classifier(data, checkpoint_dir=None):
         validset,
         # batch_size=int(config["batch_size"]),
         batch_size=64,
-        num_workers=0,
+        num_workers=2,
         sampler=valid_sampler
     )
 
@@ -137,14 +143,14 @@ def train_source_classifier(data, checkpoint_dir=None):
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         metric = d2l.Accumulator(3)
         net.train()
-        for i, (X, y) in enumerate(trainloader):
+        for i, (X, y) in enumerate(trainloader, 0):
             timer.start()
 
             print("train batch index {}, GALAXY/QSO/STAR: {}/{}/{}".format(
                 i,
-                len(np.where(np.array(trainset.indices) == 0)[0]),
-                len(np.where(np.array(trainset.indices) == 1)[0]),
-                len(np.where(np.array(trainset.indices) == 2)[0])
+                len(np.where(y.numpy() == 0)[0]),
+                len(np.where(y.numpy() == 1)[0]),
+                len(np.where(y.numpy() == 2)[0])
             ))
 
             X, y = X.to(device), y.to(device)
@@ -175,9 +181,9 @@ def train_source_classifier(data, checkpoint_dir=None):
 
                 print("validation batch index {}, GALAXY/QSO/STAR: {}/{}/{}".format(
                     i,
-                    len(np.where(np.array(validset.dataset.targets) == 0)[0]),
-                    len(np.where(np.array(validset.dataset.targets) == 1)[0]),
-                    len(np.where(np.array(validset.dataset.targets) == 2)[0])
+                    len(np.where(labels.numpy() == 0)[0]),
+                    len(np.where(labels.numpy() == 1)[0]),
+                    len(np.where(labels.numpy() == 2)[0])
                 ))
                 images, labels = images.to(device), labels.to(device)
 
