@@ -25,47 +25,27 @@ from models.GalaxyNet import GalaxyNet
 import d2l
 
 print("torch version: ", torch.__version__)
-np.random.seed(42)
-torch.manual_seed(42)
-src_root_path = os.path.join(os.getcwd(), "data/sources")  # galaxy: 7509; quasar: 738; star: 990
+src_root_path = os.path.join(os.getcwd(), "data/sources")  # galaxy: 7243; quasar: 1014; star: 982
 
+tfs = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.CenterCrop(224),
+])
 
-def make_datasets_sampler(dataset):
-    targets = [dataset.dataset.targets[idx] for idx in dataset.indices]
-    class_sample_count = np.unique(targets, return_counts=True)[1]
-    weight = 1. / class_sample_count
-    samples_weight = weight[targets]
-    samples_weight = torch.from_numpy(samples_weight)
-    sampler = WeightedRandomSampler(
-        weights=samples_weight,
-        num_samples=len(samples_weight),
-        replacement=True
-    )
-    return sampler
+# 加载图像数据集，并在加载的时候对图像施加变换
+full_dataset = FitsFolder(root=src_root_path, transform=tfs)
 
+train_set_size = int(len(full_dataset) * 0.8)
+validation_set_size = int(len(full_dataset) * 0.1)
+test_set_size = len(full_dataset) - train_set_size - validation_set_size
 
-def load_data():
-    tfs = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.CenterCrop(224),
-    ])
+train_set, validation_set, test_set = random_split(full_dataset,
+                                                   [train_set_size, validation_set_size, test_set_size])
 
-    # 加载图像数据集，并在加载的时候对图像施加变换
-    full_dataset = FitsFolder(root=src_root_path, transform=tfs)
-
-    train_set_size = int(len(full_dataset) * 0.8)
-    validation_set_size = int(len(full_dataset) * 0.1)
-    test_set_size = len(full_dataset) - train_set_size - validation_set_size
-
-    train_set, validation_set, test_set = random_split(full_dataset,
-                                                       [train_set_size, validation_set_size, test_set_size])
-
-    print("Full set size:", len(full_dataset))
-    print("Train set size: ", train_set_size)
-    print("Validation set size: ", validation_set_size)
-    print("Test set size: ", test_set_size)
-
-    return train_set, validation_set, test_set
+print("Full set size:", len(full_dataset))
+print("Train set size: ", train_set_size)
+print("Validation set size: ", validation_set_size)
+print("Test set size: ", test_set_size)
 
 
 # the accuracy on test set (not validation set!)
@@ -110,23 +90,20 @@ def train_source_classifier(data, checkpoint_dir=None):
     # optimizer = optim.SGD(net.parameters(), lr=config["lr"], weight_decay=1e-5)
     optimizer = optim.SGD(net.parameters(), lr=0.001, weight_decay=1e-5)
 
-    if checkpoint_dir:
-        model_state, optimizer_state = torch.load(os.path.join(checkpoint_dir, "checkpoint"))
-        net.load_state_dict(model_state)
-        optimizer.load_state_dict(optimizer_state)
+    # if checkpoint_dir:
+    #     model_state, optimizer_state = torch.load(os.path.join(checkpoint_dir, "checkpoint"))
+    #     net.load_state_dict(model_state)
+    #     optimizer.load_state_dict(optimizer_state)
 
     trainset, validset = data
-    train_sampler = make_datasets_sampler(trainset)
-    valid_sampler = make_datasets_sampler(validset)
 
     trainloader = DataLoader(
         trainset,
         # batch_size=int(config["batch_size"]),
         batch_size=64,
         num_workers=2,
-        sampler=train_sampler
+        shuffle=True
     )
-
 
     animator = d2l.Animator(xlabel='epoch', xlim=[1, 10], legend=['train loss', 'train_acc', 'test acc'])
     timer, num_batches = d2l.Timer(), len(trainloader)
@@ -135,7 +112,7 @@ def train_source_classifier(data, checkpoint_dir=None):
         # batch_size=int(config["batch_size"]),
         batch_size=64,
         num_workers=2,
-        sampler=valid_sampler
+        shuffle=True
     )
 
     num_epochs = 10
@@ -145,13 +122,6 @@ def train_source_classifier(data, checkpoint_dir=None):
         net.train()
         for i, (X, y) in enumerate(trainloader, 0):
             timer.start()
-
-            print("train batch index {}, GALAXY/QSO/STAR: {}/{}/{}".format(
-                i,
-                len(np.where(y.numpy() == 0)[0]),
-                len(np.where(y.numpy() == 1)[0]),
-                len(np.where(y.numpy() == 2)[0])
-            ))
 
             X, y = X.to(device), y.to(device)
             # zero the parameter gradients
@@ -178,13 +148,6 @@ def train_source_classifier(data, checkpoint_dir=None):
         for i, data in enumerate(valloader):
             with torch.no_grad():
                 images, labels = data
-
-                print("validation batch index {}, GALAXY/QSO/STAR: {}/{}/{}".format(
-                    i,
-                    len(np.where(labels.numpy() == 0)[0]),
-                    len(np.where(labels.numpy() == 1)[0]),
-                    len(np.where(labels.numpy() == 2)[0])
-                ))
                 images, labels = images.to(device), labels.to(device)
 
                 outputs = net(images)
@@ -202,7 +165,8 @@ def train_source_classifier(data, checkpoint_dir=None):
 
         val_acc = correct / total
         average_loss = val_loss / val_steps
-        tune.report(loss=average_loss, accuracy=val_acc)
+        print(f"Epoch{epoch: } the average loss is {average_loss}, the accuracy is {val_acc}")
+        # tune.report(loss=average_loss, accuracy=val_acc)
 
         animator.add(epoch + 1, (None, None, val_acc))
 
@@ -268,5 +232,4 @@ def train_source_classifier(data, checkpoint_dir=None):
 
 if __name__ == "__main__":
     # main(num_samples=10, max_num_epochs=10, gpus_per_trial=0)
-    train_set, validation_set, test_set = load_data()
     train_source_classifier(data=(train_set, validation_set))

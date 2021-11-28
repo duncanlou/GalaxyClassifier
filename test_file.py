@@ -1,39 +1,47 @@
-import shutil
+from astropy.table import Table
+import os, shutil
 
-import numpy as np
-import torch
-from torch.utils.data import WeightedRandomSampler
-from torch.utils.data.dataloader import DataLoader
+T = Table.read("data/DuncanSDSSdata.tbl", format="ipac")
+classes = list(T['class'])
+ras = list(T['ra'])
+decs = list(T['dec'])
 
-numDataPoints = 1000
-data_dim = 5
-bs = 100
+count_star = 0
+count_quasar = 0
+count_galaxy = 0
 
-# Create dummy data with class imbalance 9 to 1
-data = torch.FloatTensor(numDataPoints, data_dim)
-target = np.hstack((np.zeros(int(numDataPoints * 0.9), dtype=np.int32),
-                    np.ones(int(numDataPoints * 0.1), dtype=np.int32)))
+for dir in os.listdir("data/sources/star"):
+    if os.path.isdir(os.path.join("data/sources/star", dir)) and not dir.__contains__("p"):
+        print("不正确的源目录： ", dir)
+        raise IOError
+    if dir.__contains__("p"):
+        ra, dec = dir.split('p')
+        ra = float(ra)
 
-print('target train 0/1: {}/{}'.format(
-    len(np.where(target == 0)[0]), len(np.where(target == 1)[0])))
-
-class_sample_count = np.array(
-    [len(np.where(target == t)[0]) for t in np.unique(target)])
-weight = 1. / class_sample_count
-samples_weight = np.array([weight[t] for t in target])
-
-samples_weight = torch.from_numpy(samples_weight)
-sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
-
-target = torch.from_numpy(target).long()
-train_dataset = torch.utils.data.TensorDataset(data, target)
-
-train_loader = DataLoader(
-    train_dataset, batch_size=bs, num_workers=1, sampler=sampler)
-
-for i, (data, target) in enumerate(train_loader):
-    print("batch index {}, 0/1: {}/{}".format(
-        i,
-        len(np.where(target.numpy() == 0)[0]),
-        len(np.where(target.numpy() == 1)[0]))
-    )
+        dec = float(dec)
+        table_index = -1
+        idx1 = ras.index(ra)
+        idx2 = decs.index(dec)
+        if idx1 != idx2:
+            print(ra, dec)
+            if T[idx1]['dec'] == dec:
+                table_index = idx1
+            elif T[idx2]['ra'] == ra:
+                table_index = idx2
+            else:
+                raise ValueError
+        else:
+            table_index = idx1
+        which_type = classes[table_index]
+        print(which_type)
+        if which_type != 'STAR':
+            src = os.path.join(os.getcwd() + "/data/sources/star", dir)
+            if which_type == 'QSO':
+                dest = os.path.join(os.getcwd() + "/data/sources/quasar")
+                count_quasar += 1
+            elif which_type == 'GALAXY':
+                dest = os.path.join(os.getcwd() + "/data/sources/galaxy")
+                count_galaxy += 1
+            else:
+                raise ValueError
+            shutil.move(src, dest)
