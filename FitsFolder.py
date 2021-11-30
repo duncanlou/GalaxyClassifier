@@ -1,7 +1,8 @@
 import os
-from typing import Tuple, Dict, List, Optional, Callable, cast
+from typing import Tuple, Dict, List, Optional, Callable, cast, Any
 
 import numpy as np
+import torch
 
 from astropy.io import fits
 from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
@@ -19,6 +20,7 @@ def filter_dataset(fits_path):
         fits_n = path_levels_arr[-3] + os.path.sep + path_levels_arr[-2] + os.path.sep + path_levels_arr[-1]
         print(f"{len(row)} NaN values are found in: {fits_n}")
         if len(row) >= 50:  # if missing values pixels number is larger than 100, skip this image
+            print(f"{len(row)} NaN values are found in: {fits_n}")
             return None
         else:
             return interpolate_replace_nans(single_channel_fits_dat, kernel)
@@ -84,12 +86,14 @@ class FitsFolder(DatasetFolder):
             target_dir = os.path.join(directory, target_class)
             if not os.path.isdir(target_dir):  # if target_dir is a file, then skip it
                 continue
-            for root, dirnames, fnames in sorted(os.walk(target_dir, followlinks=True)):  # I don't quite understand 'os.walk' this API, need to study it
+            for root, dirnames, fnames in sorted(os.walk(target_dir,
+                                                         followlinks=True)):  # I don't quite understand 'os.walk' this API, need to study it
                 single_source_img_dat = []
                 for fname in sorted(fnames):  # for...else...    (tomorrow to solve it)
                     path = os.path.join(root, fname)
                     if is_valid_file(path):
-                        one_channal_img_dat = filter_dataset(path)
+                        # one_channal_img_dat = filter_dataset(path)
+                        one_channal_img_dat = fits.getdata(path)
                         if one_channal_img_dat is None:  # drop all the 5 fits file
                             break
                         single_source_img_dat.append(one_channal_img_dat)
@@ -100,7 +104,6 @@ class FitsFolder(DatasetFolder):
                     item = dat, class_index
                     instances.append(item)
 
-
         empty_classes = set(class_to_idx.keys()) - available_classes
         if empty_classes:
             msg = f"Found no valid file for the classes {', '.join(sorted(empty_classes))}. "
@@ -110,11 +113,27 @@ class FitsFolder(DatasetFolder):
 
         return instances
 
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (sample, target) where target is class_index of the target class.
+        """
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        target = torch.tensor(target)
+        return sample, target
+
     @staticmethod
     def __fits_loader(img_dat):
+
         vmax = np.max(img_dat)
         vmin = np.min(img_dat)
         img_dat[:, :, :] = (img_dat - vmin) / (vmax - vmin)
-
         return img_dat
-

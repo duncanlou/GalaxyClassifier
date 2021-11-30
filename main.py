@@ -2,6 +2,7 @@ import os
 import shutil
 from typing import cast
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 import torch
@@ -9,7 +10,7 @@ from torch import nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split, Subset
-from torch.utils.data import WeightedRandomSampler
+
 
 import torchvision.utils
 from torchvision import transforms
@@ -25,6 +26,8 @@ from models.GalaxyNet import GalaxyNet
 import d2l
 
 print("torch version: ", torch.__version__)
+writer = SummaryWriter('runs/source_classifier')
+
 src_root_path = os.path.join(os.getcwd(), "data/sources")  # galaxy: 7243; quasar: 1014; star: 982
 
 tfs = transforms.Compose([
@@ -55,8 +58,7 @@ def test_accuracy(net, device=None):
         net.eval()  # Set the model to evaluation mode
         if not device:
             device = next(iter(net.parameters())).device
-    # No. of correct predictions, no. of predictions
-    metric = d2l.Accumulator(2)
+
 
     testloader = torch.utils.data.DataLoader(
         test_set, batch_size=4, shuffle=False, num_workers=2)
@@ -75,20 +77,19 @@ def test_accuracy(net, device=None):
 
 
 def train_source_classifier(data, checkpoint_dir=None):
-    # net = GalaxyNet(config["l1"], config["l2"])
-    net = GalaxyNet(120, 84)
+    model = GalaxyNet(120, 84)
+
 
     device = 'cpu'
     if torch.cuda.is_available():
         device = "cuda:0"
         if torch.cuda.device_count() > 1:
-            net = nn.DataParallel(net)
-    net.to(device)
+            model = nn.DataParallel(model)
+    model.to(device)
     print('Using {} device'.format(device))
 
     criterion = nn.CrossEntropyLoss()
-    # optimizer = optim.SGD(net.parameters(), lr=config["lr"], weight_decay=1e-5)
-    optimizer = optim.SGD(net.parameters(), lr=0.001, weight_decay=1e-5)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-5)
 
     # if checkpoint_dir:
     #     model_state, optimizer_state = torch.load(os.path.join(checkpoint_dir, "checkpoint"))
@@ -105,73 +106,93 @@ def train_source_classifier(data, checkpoint_dir=None):
         shuffle=True
     )
 
-    animator = d2l.Animator(xlabel='epoch', xlim=[1, 10], legend=['train loss', 'train_acc', 'test acc'])
-    timer, num_batches = d2l.Timer(), len(trainloader)
+    dataiter = iter(trainloader)
+    images, labels = dataiter.__next__()
+
+
+
     valloader = DataLoader(
         validset,
         # batch_size=int(config["batch_size"]),
         batch_size=64,
         num_workers=2,
-        shuffle=True
+        shuffle=False
     )
 
     num_epochs = 10
+    valid_loss_min = np.Inf
+    val_loss = []
+    val_acc = []
+    train_loss = []
+    train_acc = []
+    total_step = len(trainloader)
 
-    for epoch in range(num_epochs):  # loop over the dataset multiple times
-        metric = d2l.Accumulator(3)
-        net.train()
-        for i, (X, y) in enumerate(trainloader, 0):
-            timer.start()
-
-            X, y = X.to(device), y.to(device)
+    for epoch in range(1, num_epochs + 1):  # loop over the dataset multiple times
+        running_loss = 0.0
+        # scheduler.step(epoch)
+        correct = 0
+        total = 0
+        print(f"Epoch {epoch}\n")
+        for batch_idx, (data_, target_) in enumerate(trainloader):
+            data_, target_ = data_.to(device), target_.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
             # forward + backward + optimize
-            y_hat = net(X)
-            loss = criterion(y_hat, y)
+            outputs = model(data_)
+            loss = criterion(outputs, target_)
             loss.backward()
             optimizer.step()
 
-            with torch.no_grad():
-                metric.add(loss * X.shape[0], d2l.accuracy(y_hat, y), X.shape[0])
-                timer.stop()
-                train_l = metric[0] / metric[2]
-                train_acc = metric[1] / metric[2]
-                if (i + 1) % (num_batches // 5) == 0 or i == num_batches - 1:
-                    animator.add(epoch + (i + 1) / num_batches, (train_l, train_acc, None))
+            # print statistics
+            running_loss += loss.item()
+            _, pred = torch.max(outputs, dim=1)
+            correct += torch.sum(pred == target_).item()
+            total += target_.size(0)
+            if (batch_idx % 10) == 0:
+                print("Epoch [{}/{}], Step[{}/{}], Loss: {:.4f}".format(epoch, 10, batch_idx, total_step, loss.item()))
+        train_acc.append(100 * correct / total)
+        train_loss.append(running_loss / total_step)
+        print(f"\ntrain loss: {np.mean(train_loss):.4f}, train acc: {(100 * correct / total):.4f} %")
 
         # validation loss
-        val_loss = 0.0
-        val_steps = 0
-        total = 0
-        correct = 0
-        for i, data in enumerate(valloader):
-            with torch.no_grad():
-                images, labels = data
+        batch_loss = 0
+        total_t = 0
+        correct_t = 0
+        with torch.no_grad():
+            model.eval()
+            for images, labels in valloader:
                 images, labels = images.to(device), labels.to(device)
+                labels_hat = model(images)
+                loss_t = criterion(labels_hat, labels)
+                batch_loss += loss_t.item()
+                _, predicted = torch.max(labels_hat, dim=1)
+                correct_t += torch.sum(predicted == labels).item()
+                total_t += labels.size(0)
 
-                outputs = net(images)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-
-                loss = criterion(outputs, labels)
-                val_loss += loss.cpu().numpy()
-                val_steps += 1
+            val_acc.append(f"{100 * correct_t / total_t } %")
+            val_loss.append(batch_loss / len(valloader))
+            network_learned = batch_loss < valid_loss_min
+            print(f"validation loss: {np.mean(val_loss):.4f}, validation acc: {(100 * correct_t / total_t):.4f} %\n")
+            if network_learned:
+                valid_loss_min = batch_loss
+                torch.save(model.state_dict(), "model_classification_tutorial.pt")
+                print('Detected network improvement, saving current model')
+        model.train()
 
         # with tune.checkpoint_dir(epoch) as checkpoint_dir:
         #     path = os.path.join(checkpoint_dir, "checkpoint")
         #     torch.save((net.state_dict(), optimizer.state_dict()), path)
-
-        val_acc = correct / total
-        average_loss = val_loss / val_steps
-        print(f"Epoch{epoch: } the average loss is {average_loss}, the accuracy is {val_acc}")
+        # print("correct", correct)
+        # print("total", total)
+        # val_acc = correct / total
+        # average_loss = val_loss / val_steps
+        # print(f"Epoch{epoch: } the average loss is {average_loss}, the accuracy is {val_acc}")
         # tune.report(loss=average_loss, accuracy=val_acc)
 
-        animator.add(epoch + 1, (None, None, val_acc))
+        # animator.add(epoch + 1, (None, None, val_acc))
 
-    print(f'loss {train_l:.3f}, train acc {train_acc * 100:.5f}%, ' f'test acc {val_acc * 100:.5f}%')
-    print(f'{metric[2] * num_epochs / timer.sum():.1f} examples/sec ' f'on {str(device)}')
+    # print(f'loss {train_l:.3f}, train acc {train_acc * 100:.5f}%, ' f'test acc {val_acc * 100:.5f}%')
+    # print(f'{metric[2] * num_epochs / timer.sum():.1f} examples/sec ' f'on {str(device)}')
 
     print('Finished Training')
 

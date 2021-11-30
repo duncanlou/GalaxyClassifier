@@ -33,7 +33,8 @@ class GalaxyNet(nn.Module):
             nn.Dropout(p=0.5),
             nn.Linear(l1, l2),
             nn.ReLU(inplace=True),
-            nn.Linear(l2, 3)
+            nn.Linear(l2, 3),
+            nn.Softmax(0)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
