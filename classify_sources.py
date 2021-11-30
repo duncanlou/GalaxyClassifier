@@ -3,9 +3,9 @@ import shutil
 from astropy.table import Table
 
 
-src_root_path = os.path.join(os.getcwd(), "data/sources")
+src_root_path = os.path.join(os.getcwd(), "data/images14")
 T = Table.read("data/DuncanSDSSdata.tbl", format="ascii.ipac")
-src_table = T[130000:140000]
+src_table = T[130000:150000]
 ra_tab = list(src_table['ra'])
 dec_tab = list(src_table['dec'])
 sourceObjs = []
