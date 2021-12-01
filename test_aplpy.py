@@ -3,7 +3,7 @@ import os
 import aplpy
 from astropy.io import fits
 
-root = "data/sources/galaxy"
+root = "data/sources/star"
 
 sources = os.listdir(root)
 
@@ -29,7 +29,7 @@ def get_fits_dict(imgs, source_dir):
     return fits_dict
 
 
-new_dir_name = "data/sources/new_gal"
+new_dir_name = "data/sources/new_STAR"
 
 for s in sources:
     full_s = os.path.join(root, s)
@@ -47,7 +47,7 @@ for s in sources:
     if float(dec_s) > 0:
         dec_s = f"+{dec_s}"
 
-    dest = f"data/sources/new_gal/{ra_s}_{dec_s}_cube.fits"
+    dest = f"data/sources/new_STAR/{ra_s}_{dec_s}_cube.fits"
 
     s_dest = f"{ra_s}_{dec_s}_cube.fits"
 

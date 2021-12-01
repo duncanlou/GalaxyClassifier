@@ -1,7 +1,7 @@
 from astropy.table import Table
 from torch.utils.data import Dataset
 
-from FitsFolder import FitsFolder
+from FitsImageFolder import FitsImageFolder
 
 
 class CelebDataset(Dataset):
