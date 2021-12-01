@@ -1,45 +1,44 @@
 import os
-
 import numpy as np
 from astropy.io import fits
-from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
+from astropy.table import Table
 
-root = os.getcwd() + os.path.sep + "images14"
+T = Table.read("data/DuncanSDSSdata.tbl", format="ipac")
+ras = T["ra"]
+decs = T["dec"]
 
-kernel = Gaussian2DKernel(x_stddev=1)
+positions = []
+for i in range(len(ras)):
+    ra = round(ras[i], 6)
+    dec = round(decs[i], 6)
+    positions.append((ra, dec))
 
+classes = T["class"]
 
-raw_src_imgs = [os.path.join(root, a_src) for a_src in os.listdir(root)]
+files = os.listdir("data/sources/STAR")
 
-fixed_src_imgs = []
-for i in range(len(raw_src_imgs)):
-    fixed_src_imgs.append(raw_src_imgs[i])
-
-
-
-
-
-def scan_and_fix_damaged_image(raw_images):
-    for i in range(5):
-        row, col = np.where(np.isnan(raw_images[i]))
-        print(f"Bad pixel num: {len(row)}")
-        if len(row) >= 240 * 240 * 0.05:  # if missing values pixels number takes up 5% of the image, discard this image
-            # delete this source's related images
-            fixed_src_imgs.remove(file_dir)
-            print(file_dir + "is removed")
-
-
-
-
-
-
-
-for i in range(len(raw_src_imgs)):
-    a_source = raw_src_imgs[i]
-    tmp = []
-    print(f"正在scan第{i}个source")
-    for fits_file in os.listdir(a_source):
-        scan_and_fix_damaged_image(os.path.join(a_source, fits_file), a_source)
+for f in files:
+    name_arr = f.split("_")
+    ra_f = np.float(name_arr[0])
+    ra_f = round(ra_f, 6)
+    dec_f = np.float(name_arr[1])
+    dec_f = round(dec_f, 6)
+    pos = ra_f, dec_f
+    if positions.__contains__(pos):
+        idx = positions.index(pos)
+        if classes[idx] != "STAR":
+            print("分类分错了", pos, "真实的类", classes[idx])
+            raise IOError
+    else:
+        i = list(ras).index(ra_f)
+        table_dec = decs[i]
+        if abs(table_dec - dec_f) > 1e-4:
+            print(f"没在table中找到{pos}")
 
 
-print(f"sources2's length is: {len(fixed_src_imgs)}")
+
+
+
+
+
+
