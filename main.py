@@ -7,6 +7,7 @@ from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
+from sklearn.model_selection import ShuffleSplit
 
 # import from local project
 from FitsImageFolder import FitsImageFolder
@@ -18,19 +19,24 @@ writer = SummaryWriter('runs/source_classifier')
 src_root_path = os.path.join(os.getcwd(), "data/sources")  # galaxy: 7243; quasar: 1014; star: 982
 
 tfs = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.CenterCrop(224),
+    transforms.ToTensor()
 ])
 
 # 加载图像数据集，并在加载的时候对图像施加变换
 dataset = FitsImageFolder(root="data/sources", transform=tfs)
+ss = ShuffleSplit(n_splits=1, test_size=0.25, random_state=0)
 
-train_set_size = int(len(dataset) * 0.8)
-validation_set_size = int(len(dataset) * 0.1)
-test_set_size = len(dataset) - train_set_size - validation_set_size
+for train_index, test_index in ss.split(dataset):
+    print("%s %s" % (train_index, test_index))
 
-train_set, validation_set, test_set = random_split(dataset,
-                                                   [train_set_size, validation_set_size, test_set_size])
+
+
+# train_set_size = int(len(dataset) * 0.8)
+# validation_set_size = int(len(dataset) * 0.1)
+# test_set_size = len(dataset) - train_set_size - validation_set_size
+#
+# train_set, validation_set, test_set = random_split(dataset,
+#                                                    [train_set_size, validation_set_size, test_set_size])
 
 print("Full set size:", len(dataset))
 print("Train set size: ", train_set_size)
@@ -62,8 +68,8 @@ def train_source_classifier(data):
         shuffle=True
     )
 
-    dataiter = iter(trainloader)
-    images, labels = dataiter.__next__()
+    # dataiter = iter(trainloader)
+    # images, labels = dataiter.__next__()
 
     valloader = DataLoader(
         validset,
