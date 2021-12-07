@@ -105,17 +105,35 @@ def get_fits_dict(imgs, source_dir):
 
     return fits_dict
 
+def CatPSimgMinMax(image_cube):
+    medflux = np.median(image_cube)
+    madflux = np.median(np.abs(image_cube - medflux))
 
+    lomad, himad = (-2.0, 10.0)  # number of mads to the min and max
+
+    minflux = medflux + lomad * madflux
+    maxflux = medflux + himad * madflux
+
+    # midflux = medflux  + 0.5 * (himad + lomad) * madflux
+    # radflux = 0.5 * (himad - lomad) * madflux
+
+    return minflux, maxflux
+
+from astropy.visualization import ImageNormalize, MinMaxInterval, SqrtStretch
 
 def showImages(img):
     g = img[0]  # blue
     i = img[1]  # red
     r = img[2]  # green
+
     color_fits = torch.stack((i, r, g), dim=0)
+    vmin, vmax = CatPSimgMinMax(color_fits)
+    norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=SqrtStretch())
 
-    grid = torchvision.utils.make_grid(color_fits)
-    plt.imshow(grid.numpy().transpose((1, 2, 0)))
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    im = ax.imshow(color_fits.numpy().transpose((1, 2, 0)), origin='lower', norm=norm)
+    fig.colorbar(im)
     plt.show()
-
 
 
