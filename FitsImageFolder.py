@@ -1,11 +1,17 @@
 import logging
 import os
-from typing import Dict, Optional, Callable, List, Tuple, cast
+from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
 from astropy.io import fits
+from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
+kernel = Gaussian2DKernel(x_stddev=1)
+from astropy.nddata import CCDData, Cutout2D
+
 from torchvision.datasets import DatasetFolder
-from torchvision.datasets.folder import has_file_allowed_extension, find_classes
+from torchvision.datasets.folder import find_classes
+
+import matplotlib.pyplot as plt
 
 
 def make_dataset(
@@ -33,12 +39,6 @@ def make_dataset(
     if both_none or both_something:
         raise ValueError("Both extensions and is_valid_file cannot be None or not None at the same time")
 
-    if extensions is not None:
-        def is_valid_file(x: str) -> bool:
-            return has_file_allowed_extension(x, cast(Tuple[str, ...], extensions))
-
-    is_valid_file = cast(Callable[[str], bool], is_valid_file)
-
     instances = []
     available_classes = set()
     for target_class in sorted(class_to_idx.keys()):
@@ -51,19 +51,17 @@ def make_dataset(
                 path = os.path.join(root, dir)
                 if os.path.isdir(path):
                     item = path, class_index
-                    instances.append(item)
-
-                    if target_class not in available_classes:
-                        available_classes.add(target_class)
-
-            # for fname in sorted(fnames):
-            #     if is_valid_file(fname):
-            #         path = os.path.join(root, fname)
-            #         item = path, class_index
-            #         instances.append(item)
-            #
-            #         if target_class not in available_classes:
-            #             available_classes.add(target_class)
+                    fits_img = [os.path.join(path, f) for f in os.listdir(path)]
+                    for f in fits_img:
+                        img_dat = fits.getdata(f)
+                        x, y = np.where(np.isnan(img_dat))
+                        if len(x) > 50:  # drop this sources
+                            logging.warning(f"{f} contains {len(x)} nan pixels, has been removed from dataset")
+                            break
+                    else:
+                        instances.append(item)
+                        if target_class not in available_classes:
+                            available_classes.add(target_class)
 
     empty_classes = set(class_to_idx.keys()) - available_classes
     if empty_classes:
@@ -137,8 +135,9 @@ class FitsImageFolder(DatasetFolder):
         for i in range(5):
             fits_f = src_dir_contents[i]
             single_channel_img_dat = fits.getdata(os.path.join(source_dir_name, fits_f))
-            img_list.append(single_channel_img_dat)
+            # replace bad data with values interpolated from their neighbors
+            fixed_img = interpolate_replace_nans(single_channel_img_dat, kernel)
+            img_list.append(fixed_img)
 
-        img_dat = np.stack(img_list, axis=2)
-        print(img_dat.shape)
+        img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
         return img_dat
