@@ -4,10 +4,14 @@ import shutil
 
 import astropy.table
 import numpy as np
+import torch
+import torchvision.utils
 from astropy.io import fits
 from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
-
 kernel = Gaussian2DKernel(x_stddev=1)
+
+import matplotlib.pyplot as plt
+
 
 
 def rmnan(filename):
@@ -100,6 +104,18 @@ def get_fits_dict(imgs, source_dir):
             raise ValueError
 
     return fits_dict
+
+
+
+def showImages(img):
+    g = img[0]  # blue
+    i = img[1]  # red
+    r = img[2]  # green
+    color_fits = torch.stack((i, r, g), dim=0)
+
+    grid = torchvision.utils.make_grid(color_fits)
+    plt.imshow(grid.numpy().transpose((1, 2, 0)))
+    plt.show()
 
 
 
