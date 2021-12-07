@@ -20,7 +20,7 @@ src_root_path = os.path.join(os.getcwd(), "data/sources")
 
 tfs = transforms.Compose([
     transforms.ToTensor(),
-    transforms.CenterCrop((50, 50))
+    transforms.CenterCrop(90),
 ])
 
 # 加载图像数据集，并在加载的时候对图像施加变换
@@ -37,6 +37,10 @@ print("Full set size:", len(dataset))
 print("Train set size: ", train_set_size)
 print("Validation set size: ", validation_set_size)
 print("Test set size: ", test_set_size)
+
+train_set_size = int(len(dataset) * 0.8)
+validation_set_size = int(len(dataset) * 0.1)
+test_set_size = len(dataset) - train_set_size - validation_set_size
 
 
 def train_source_classifier(data):
@@ -98,7 +102,6 @@ def train_source_classifier(data):
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, batch_idx + 1, running_loss / 20))
                 running_loss = 0.0
-
 
         # validation loss
         batch_loss = 0

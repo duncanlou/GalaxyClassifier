@@ -1,17 +1,23 @@
 import logging
 import os
+import shutil
 from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
 from astropy.io import fits
 from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
+from astropy.visualization import ImageNormalize
+
 kernel = Gaussian2DKernel(x_stddev=1)
 from astropy.nddata import CCDData, Cutout2D
+from ccdproc import CCDData, Combiner
 
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
 import matplotlib.pyplot as plt
+
+from utils import CatPSimgMinMax
 
 
 def make_dataset(
@@ -56,6 +62,7 @@ def make_dataset(
                         img_dat = fits.getdata(f)
                         x, y = np.where(np.isnan(img_dat))
                         if len(x) > 50:  # drop this sources
+                            shutil.rmtree(path)
                             logging.warning(f"{f} contains {len(x)} nan pixels, has been removed from dataset")
                             break
                     else:
@@ -123,6 +130,7 @@ class FitsImageFolder(DatasetFolder):
             )
         return make_dataset(directory, class_to_idx, extensions=extensions, is_valid_file=is_valid_file)
 
+    from astropy.visualization import LogStretch, ImageNormalize, SinhStretch, ZScaleInterval
     @staticmethod
     def __fits_loader(source_dir_name):
         src_dir_contents = os.listdir(source_dir_name)
@@ -135,9 +143,14 @@ class FitsImageFolder(DatasetFolder):
         for i in range(5):
             fits_f = src_dir_contents[i]
             single_channel_img_dat = fits.getdata(os.path.join(source_dir_name, fits_f))
-            # replace bad data with values interpolated from their neighbors
-            fixed_img = interpolate_replace_nans(single_channel_img_dat, kernel)
-            img_list.append(fixed_img)
+            row, col = np.where(np.isnan(single_channel_img_dat))
+            if len(row) != 0:
+                # replace bad data with values interpolated from their neighbors
+                single_channel_img_dat = interpolate_replace_nans(single_channel_img_dat, kernel)
+            img_list.append(single_channel_img_dat)
 
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
+        minflux, maxflux = CatPSimgMinMax(img_dat)
+
+
         return img_dat
