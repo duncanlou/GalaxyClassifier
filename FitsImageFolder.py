@@ -130,7 +130,7 @@ class FitsImageFolder(DatasetFolder):
             )
         return make_dataset(directory, class_to_idx, extensions=extensions, is_valid_file=is_valid_file)
 
-    from astropy.visualization import LogStretch, ImageNormalize, SinhStretch, ZScaleInterval
+
     @staticmethod
     def __fits_loader(source_dir_name):
         src_dir_contents = os.listdir(source_dir_name)
@@ -140,6 +140,7 @@ class FitsImageFolder(DatasetFolder):
         src_dir_contents.sort()
 
         img_list = []
+        center_max = 0
         for i in range(5):
             fits_f = src_dir_contents[i]
             single_channel_img_dat = fits.getdata(os.path.join(source_dir_name, fits_f))
@@ -147,10 +148,19 @@ class FitsImageFolder(DatasetFolder):
             if len(row) != 0:
                 # replace bad data with values interpolated from their neighbors
                 single_channel_img_dat = interpolate_replace_nans(single_channel_img_dat, kernel)
+                central_pixs = single_channel_img_dat[119:121, 119:121]
+                if np.max(central_pixs) > center_max:
+                    center_max = central_pixs
+
             img_list.append(single_channel_img_dat)
 
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
-        minflux, maxflux = CatPSimgMinMax(img_dat)
+        # minflux, maxflux = CatPSimgMinMax(img_dat)
 
+        print(f"center_max: {center_max}")
+
+        img_dat = np.where(img_dat > center_max, center_max, img_dat)
+
+        img_dat = (img_dat - np.min(img_dat)) / (np.max(img_dat) - np.min(img_dat))
 
         return img_dat
