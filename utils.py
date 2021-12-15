@@ -8,10 +8,12 @@ import torch
 import torchvision.utils
 from astropy.io import fits
 from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
+from astropy.stats import gaussian_fwhm_to_sigma
+from photutils import detect_threshold, detect_sources
+
 kernel = Gaussian2DKernel(x_stddev=1)
 
 import matplotlib.pyplot as plt
-
 
 
 def rmnan(filename):
@@ -32,6 +34,15 @@ def rmnan(filename):
             image[i, :, :] = fixed_img
     fits.update(filename, image, header=header)
     return image
+
+
+def remove_nan(image_dat):
+    kernel = Gaussian2DKernel(x_stddev=2)
+    row, col = np.where(np.isnan(image_dat))
+    if len(row) > 0:
+        # replace bad data with values interpolated from their neighbors
+        image_dat = interpolate_replace_nans(image_dat, kernel)
+    return image_dat
 
 
 def classify_downloaded_sources(dir):
@@ -105,9 +116,10 @@ def get_fits_dict(imgs, source_dir):
 
     return fits_dict
 
-def CatPSimgMinMax(image_cube):
-    medflux = np.median(image_cube)
-    madflux = np.median(np.abs(image_cube - medflux))
+
+def CatPSimgMinMax(img_dat):
+    medflux = np.median(img_dat)
+    madflux = np.median(np.abs(img_dat - medflux))
 
     lomad, himad = (-2.0, 10.0)  # number of mads to the min and max
 
@@ -119,7 +131,9 @@ def CatPSimgMinMax(image_cube):
 
     return minflux, maxflux
 
+
 from astropy.visualization import ImageNormalize, MinMaxInterval, SqrtStretch
+
 
 def showImages(img):
     g = img[0]  # blue
@@ -137,3 +151,14 @@ def showImages(img):
     plt.show()
 
 
+def have_source_in_center(image_dat):
+    sigma = 3.0 * gaussian_fwhm_to_sigma  # FWHM = 3
+    kenl = Gaussian2DKernel(sigma, x_size=3, y_size=3)
+    kenl.normalize()
+
+    threshold = detect_threshold(image_dat, nsigma=2.)
+    segm = detect_sources(image_dat, threshold, npixels=5, kernel=kenl)
+    if segm is None:
+        return False
+    else:
+        return True

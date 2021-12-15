@@ -1,23 +1,17 @@
 import logging
 import os
-import shutil
 from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
+from astropy.convolution import Gaussian2DKernel
 from astropy.io import fits
-from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
-from astropy.visualization import ImageNormalize
 
-kernel = Gaussian2DKernel(x_stddev=1)
-from astropy.nddata import CCDData, Cutout2D
-from ccdproc import CCDData, Combiner
+from astropy.visualization import SinhStretch
 
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
-import matplotlib.pyplot as plt
-
-from utils import CatPSimgMinMax
+from utils import CatPSimgMinMax, remove_nan
 
 
 def make_dataset(
@@ -57,18 +51,9 @@ def make_dataset(
                 path = os.path.join(root, dir)
                 if os.path.isdir(path):
                     item = path, class_index
-                    fits_img = [os.path.join(path, f) for f in os.listdir(path)]
-                    for f in fits_img:
-                        img_dat = fits.getdata(f)
-                        x, y = np.where(np.isnan(img_dat))
-                        if len(x) > 50:  # drop this sources
-                            shutil.rmtree(path)
-                            logging.warning(f"{f} contains {len(x)} nan pixels, has been removed from dataset")
-                            break
-                    else:
-                        instances.append(item)
-                        if target_class not in available_classes:
-                            available_classes.add(target_class)
+                    instances.append(item)
+                    if target_class not in available_classes:
+                        available_classes.add(target_class)
 
     empty_classes = set(class_to_idx.keys()) - available_classes
     if empty_classes:
@@ -130,7 +115,6 @@ class FitsImageFolder(DatasetFolder):
             )
         return make_dataset(directory, class_to_idx, extensions=extensions, is_valid_file=is_valid_file)
 
-
     @staticmethod
     def __fits_loader(source_dir_name):
         src_dir_contents = os.listdir(source_dir_name)
@@ -140,27 +124,23 @@ class FitsImageFolder(DatasetFolder):
         src_dir_contents.sort()
 
         img_list = []
-        center_max = 0
+        image_cube_vmax = 0
         for i in range(5):
             fits_f = src_dir_contents[i]
             single_channel_img_dat = fits.getdata(os.path.join(source_dir_name, fits_f))
-            row, col = np.where(np.isnan(single_channel_img_dat))
-            if len(row) != 0:
-                # replace bad data with values interpolated from their neighbors
-                single_channel_img_dat = interpolate_replace_nans(single_channel_img_dat, kernel)
-                central_pixs = single_channel_img_dat[119:121, 119:121]
-                if np.max(central_pixs) > center_max:
-                    center_max = central_pixs
+            single_channel_img_dat = remove_nan(single_channel_img_dat)
+
+            center_region = single_channel_img_dat[100:140, 100:140]
+            _, vmax = CatPSimgMinMax(center_region)
+            single_channel_img_dat = np.where(single_channel_img_dat > vmax, vmax, single_channel_img_dat)
+            if vmax > image_cube_vmax:
+                image_cube_vmax = vmax
 
             img_list.append(single_channel_img_dat)
 
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
-        # minflux, maxflux = CatPSimgMinMax(img_dat)
-
-        print(f"center_max: {center_max}")
-
-        img_dat = np.where(img_dat > center_max, center_max, img_dat)
-
-        img_dat = (img_dat - np.min(img_dat)) / (np.max(img_dat) - np.min(img_dat))
+        strech = SinhStretch()
+        img_dat = (img_dat - np.min(img_dat)) / (image_cube_vmax - np.min(img_dat))
+        img_dat = strech.__call__(img_dat)
 
         return img_dat

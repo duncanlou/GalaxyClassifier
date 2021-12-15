@@ -1,12 +1,20 @@
 import os
+from functools import partial
 
 import numpy as np
 import torch
 import torch.optim as optim
+import torchsummary
 from torch import nn
+from torch.autograd import Variable
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
+from torchvision import transforms, models
+
+import ray
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
 
 # import from local project
 from FitsImageFolder import FitsImageFolder
@@ -14,122 +22,203 @@ from models.GalaxyNet import GalaxyNet
 from utils import showImages
 
 print("torch version: ", torch.__version__)
-writer = SummaryWriter('runs/source_classifier')
 
 src_root_path = os.path.join(os.getcwd(), "data/sources")
 
-tfs = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.CenterCrop(90),
-])
 
-# 加载图像数据集，并在加载的时候对图像施加变换
-dataset = FitsImageFolder(root="data/sources", transform=tfs)
+def load_data(data_dir=src_root_path):
+    tfs = transforms.Compose([
+        transforms.ToTensor(),
+        # transforms.CenterCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(90)
+    ])
 
-train_set_size = int(len(dataset) * 0.8)
-validation_set_size = int(len(dataset) * 0.1)
-test_set_size = len(dataset) - train_set_size - validation_set_size
+    # 加载图像数据集，并在加载的时候对图像施加变换
+    dataset = FitsImageFolder(root=src_root_path, transform=tfs)
+    train_set_size = int(len(dataset) * 0.8)
+    test_set_size = len(dataset) - train_set_size
+    train_set, test_set = random_split(dataset, [train_set_size, test_set_size])
 
-train_set, validation_set, test_set = random_split(dataset,
-                                                   [train_set_size, validation_set_size, test_set_size])
+    print("Full set size:", len(dataset))
+    print("Train set size: ", train_set_size)
+    print("Test set size: ", test_set_size)
 
-print("Full set size:", len(dataset))
-print("Train set size: ", train_set_size)
-print("Validation set size: ", validation_set_size)
-print("Test set size: ", test_set_size)
-
-train_set_size = int(len(dataset) * 0.8)
-validation_set_size = int(len(dataset) * 0.1)
-test_set_size = len(dataset) - train_set_size - validation_set_size
+    return train_set, test_set
 
 
-def train_source_classifier(data):
-    model = GalaxyNet(120, 84)
+num_epochs = 5
+valid_loss_min = np.Inf
+val_loss = []
+val_acc = []
 
-    device = 'cpu'
+
+def train_loop(config, checkpoint_dir=None, data_dir=None):
+    model = GalaxyNet(config["l1"], config["l2"])
+    device = "cpu"
     if torch.cuda.is_available():
         device = "cuda:0"
         if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
+            net = nn.DataParallel(net)
     model.to(device)
-    print('Using {} device'.format(device))
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-5)
+    # optimizer = optim.SGD(model.parameters(), lr=config["lr"], weight_decay=1e-5)
+    optimizer = optim.SGD(model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"],
+                          momentum=config["momentum"])
 
-    trainset, validset = data
+    if checkpoint_dir:
+        model_state, optimizer_state = torch.load(os.path.join(checkpoint_dir, "checkpoint"))
+        model.load_state_dict(model_state)
+        optimizer.load_state_dict(optimizer_state)
+
+    train_set, test_set = load_data(data_dir)
+    test_abs = int(len(train_set) * 0.8)
+    train_subset, val_subset = random_split(train_set, [test_abs, len(train_set) - test_abs])
 
     training_loader = DataLoader(
-        trainset,
-        # batch_size=int(config["batch_size"]),
-        batch_size=64,
-        num_workers=2,
-        shuffle=True
+        train_subset,
+        batch_size=int(config["batch_size"]),
+        shuffle=True,
+        num_workers=8
     )
 
     validation_loader = DataLoader(
-        validset,
-        batch_size=64,
-        num_workers=2,
-        shuffle=False
+        val_subset,
+        batch_size=int(config["batch_size"]),
+        shuffle=True,
+        num_workers=8
     )
 
-    num_epochs = 10
-    valid_loss_min = np.Inf
-    val_loss = []
-    val_acc = []
-
     total_step = len(training_loader)
-
     for epoch in range(num_epochs):
-
         running_loss = 0.0
+        epoch_steps = 0
         for batch_idx, (images, labels) in enumerate(training_loader):
-            if batch_idx == 0:
-                showImages(images[0])
+            # if batch_idx == 0:
+            #     showImages(images[0])
             images, labels = images.to(device), labels.to(device)
+
             # zero the parameter gradients
             optimizer.zero_grad()
-            # forward + backward + optimize
+
+            # Forward pass
             outputs = model(images)
             loss = criterion(outputs, labels)
+
+            # Backward and optimize
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if batch_idx % 20 == 19:  # print every 20 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, batch_idx + 1, running_loss / 20))
+            epoch_steps += 1
+
+            if batch_idx % 20 == 0:  # print every 20 mini-batches
+                print("[%d, %5d] loss: %.3f" % (epoch + 1, batch_idx + 1,
+                                                running_loss / epoch_steps))
                 running_loss = 0.0
 
-        # validation loss
-        batch_loss = 0
-        total_t = 0
-        correct_t = 0
-        with torch.no_grad():
-            model.eval()
-            for images, labels in validation_loader:
-                images, labels = images.to(device), labels.to(device)
-                labels_hat = model(images)
-                loss_t = criterion(labels_hat, labels)
-                batch_loss += loss_t.item()
-                _, predicted = torch.max(labels_hat, dim=1)
-                correct_t += torch.sum(predicted == labels).item()
-                total_t += labels.size(0)
+        # Validation loss
+        val_loss = 0.0
+        val_steps = 0
+        total = 0
+        correct = 0
+        for i, data in enumerate(validation_loader, 0):
+            with torch.no_grad():
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
 
-            val_acc.append(f"{100 * correct_t / total_t} %")
-            val_loss.append(batch_loss / len(validation_loader))
-            network_learned = batch_loss < valid_loss_min
-            print(f"validation loss: {np.mean(val_loss):.4f}, validation acc: {(100 * correct_t / total_t):.4f} %\n")
-            if network_learned:
-                valid_loss_min = batch_loss
-                torch.save(model.state_dict(), "model_classification_tutorial.pt")
-                print('Detected network improvement, saving current model')
-        model.train()
+                outputs = model(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    print('Finished Training')
+                loss = criterion(outputs, labels)
+                val_loss += loss.cpu().numpy()
+                val_steps += 1
+
+        with tune.checkpoint_dir(epoch) as checkpoint_dir:
+            path = os.path.join(checkpoint_dir, "checkpoint")
+            torch.save((model.state_dict(), optimizer.state_dict()), path)
+        tune.report(loss=(val_loss / val_steps), accuracy=correct / total)
+
+    print("Finished Training")
+
+
+def test_accuracy(net, device='cpu'):
+    trainset, testset = load_data()
+
+    testloader = DataLoader(testset, batch_size=8, shuffle=False, num_workers=2)
+
+    correct = 0
+    total = 0
+    net.eval() # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data
+            images, labels = images.to(device), labels.to(device)
+            outputs = net(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    return correct / total
+
+
+def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
+    load_data(src_root_path)
+    config = {
+        "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        "lr": tune.loguniform(1e-5, 1e-1),
+        "batch_size": tune.choice([2, 4, 8, 16, 32, 64, 128]),
+        "weight_decay": tune.loguniform(1e-6, 1e-1),
+        "momentum": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    }
+    scheduler = ASHAScheduler(
+        metric="loss",
+        mode="min",
+        max_t=max_num_epochs,
+        grace_period=1,
+        reduction_factor=2)
+
+    reporter = CLIReporter(
+        # parameter_columns=["l1", "l2", "lr", "batch_size"],
+        metric_columns=["loss", "accuracy", "training_iteration"])
+
+    result = tune.run(
+        tune.with_parameters(train_loop, data_dir=src_root_path),
+        resources_per_trial={"cpu": 8, "gpu": gpus_per_trial},
+        config=config,
+        num_samples=num_samples,
+        scheduler=scheduler,
+        progress_reporter=reporter)
+
+    best_trial = result.get_best_trial("loss", "min", "last")
+    print("Best trial config: {}".format(best_trial.config))
+    print("Best trial final validation loss: {}".format(
+        best_trial.last_result["loss"]))
+    print("Best trial final validation accuracy: {}".format(
+        best_trial.last_result["accuracy"]))
+
+    best_trained_model = GalaxyNet(best_trial.config["l1"], best_trial.config["l2"])
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda:0"
+        if gpus_per_trial > 1:
+            best_trained_model = nn.DataParallel(best_trained_model)
+    best_trained_model.to(device)
+    best_checkpoint_dir = best_trial.checkpoint.value
+    model_state, optimizer_state = torch.load(os.path.join(
+        best_checkpoint_dir, "checkpoint"))
+    best_trained_model.load_state_dict(model_state)
+
+    test_acc = test_accuracy(best_trained_model, device)
+    print("Best trial test set accuracy: {}".format(test_acc))
 
 
 if __name__ == "__main__":
-    train_source_classifier(data=(train_set, validation_set))
+    # You can change the number of GPUs per trial here:
+    main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5)

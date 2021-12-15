@@ -8,43 +8,31 @@ import torchsummary
 # Define a convolution neural network
 class GalaxyNet(nn.Module):
     def __init__(self, l1=120, l2=84):
-        super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(5, 16, kernel_size=(5, 5)),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=(2, 2)),
-            nn.Conv2d(16, 32, kernel_size=(3, 3), padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=(2, 2)),
-            nn.Conv2d(32, 64, kernel_size=3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=(2, 2)),
+        super(GalaxyNet, self).__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(5, 16, kernel_size=5, stride=1, padding=2),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
         )
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=5, stride=1, padding=2),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
 
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.classifier = nn.Sequential(
-            nn.Dropout(p=0.5),
-            nn.Linear(64 * 6 * 6, l1),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(l1, l2),
-            nn.ReLU(inplace=True),
-            nn.Linear(l2, 3),
-            nn.Softmax(0)
-        )
+        self.fc1 = nn.Linear(60 * 60 * 32, l1)
+        self.fc2 = nn.Linear(l1, l2)
+        self.fc3 = nn.Linear(l2, 3)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = x.reshape(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
-
 
 # net = GalaxyNet()
 # torchsummary.summary(net, input_size=(5, 240, 240), device="cpu")
-
