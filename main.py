@@ -17,18 +17,20 @@ from ray.tune.schedulers import ASHAScheduler
 
 # import from local project
 from FitsImageFolder import FitsImageFolder
-from models.GalaxyNet import GalaxyNet
+from models.protoNet import GalaxyNet
+from models.vggnet import vggNet
 from utils import showImages
 
 print("torch version: ", torch.__version__)
 
 src_root_path = os.path.join(os.getcwd(), "data/sources")
+conv_arch = ((1, 64), (1, 128), (2, 256), (2, 512), (2, 512)) # vgg-11
 
 
 def load_data(data_dir=src_root_path):
     tfs = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.CenterCrop(224),
+        transforms.CenterCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(90)
@@ -51,7 +53,9 @@ num_epochs = 10
 
 
 def train_loop(config, checkpoint_dir=None, data_dir=None):
-    model = GalaxyNet(config["l1"], config["l2"])
+    # model = GalaxyNet(config["l1"], config["l2"])
+    model = vggNet(vgg_block_param=conv_arch)
+
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda:0"
@@ -75,17 +79,18 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
         train_subset,
         batch_size=int(config["batch_size"]),
         shuffle=True,
-        num_workers=8
+        num_workers=4
     )
 
     validation_loader = DataLoader(
         val_subset,
         batch_size=int(config["batch_size"]),
         shuffle=True,
-        num_workers=8
+        num_workers=4
     )
 
     total_step = len(training_loader)
+    print("total_step:", total_step)
     for epoch in range(num_epochs):
         running_loss = 0.0
         epoch_steps = 0
@@ -109,10 +114,10 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
             running_loss += loss.item()
             epoch_steps += 1
 
-            if batch_idx % 20 == 0:  # print every 20 mini-batches
-                print("[%d, %5d] loss: %.5f" % (epoch + 1, batch_idx + 1,
-                                                running_loss / epoch_steps))
-                running_loss = 0.0
+            print("[%d, %5d] loss: %.5f" % (epoch + 1, batch_idx + 1,
+                                            running_loss / epoch_steps))
+            running_loss = 0.0
+
 
         # Validation loss
         val_loss = 0.0
@@ -164,8 +169,8 @@ def test_accuracy(net, device='cpu'):
 def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
     load_data(src_root_path)
     config = {
-        "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
-        "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        # "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        # "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
         "lr": tune.loguniform(1e-5, 1e-1),
         "batch_size": tune.choice([2, 4, 8, 16, 32, 64, 128]),
     }
@@ -182,7 +187,7 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
 
     result = tune.run(
         tune.with_parameters(train_loop, data_dir=src_root_path),
-        resources_per_trial={"cpu": 8, "gpu": gpus_per_trial},
+        resources_per_trial={"cpu": 4, "gpu": gpus_per_trial},
         config=config,
         num_samples=num_samples,
         scheduler=scheduler,
@@ -195,7 +200,8 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
     print("Best trial final validation accuracy: {}".format(
         best_trial.last_result["accuracy"]))
 
-    best_trained_model = GalaxyNet(best_trial.config["l1"], best_trial.config["l2"])
+    # best_trained_model = GalaxyNet(best_trial.config["l1"], best_trial.config["l2"])
+    best_trained_model = vggNet(vgg_block_param=conv_arch)
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda:0"
@@ -213,4 +219,4 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
 
 if __name__ == "__main__":
     # You can change the number of GPUs per trial here:
-    main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5)
+    main(num_samples=10, max_num_epochs=10, gpus_per_trial=0)

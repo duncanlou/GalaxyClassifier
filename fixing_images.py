@@ -11,13 +11,13 @@ galaxy_source_root = os.path.join(os.getcwd(), "data/sources/GALAXY")
 star_source_root = os.path.join(os.getcwd(), "data/sources/STAR")
 quasar_source_root = os.path.join(os.getcwd(), "data/sources/QSO")
 
-too_many_nan_galaxy = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/too_many_invalid_values/GALAXY"
-too_many_nan_star = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/too_many_invalid_values/STAR"
-too_many_nan_QSO = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/too_many_invalid_values/QSO"
+too_many_nan_galaxy = os.path.join(os.getcwd(), 'data/too_many_invalid_values/GALAXY')
+too_many_nan_star = os.path.join(os.getcwd(), 'data/too_many_invalid_values/STAR')
+too_many_nan_QSO = os.path.join(os.getcwd(), 'data/too_many_invalid_values/QSO')
 
-no_source_in_center_galaxy = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/GALAXY"
-no_source_in_center_star = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/STAR"
-no_source_in_center_QSO = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/QSO"
+no_source_in_center_galaxy = os.path.join(os.getcwd(), "data/no_source_in_center/GALAXY")
+no_source_in_center_star = os.path.join(os.getcwd(), "data/no_source_in_center/STAR")
+no_source_in_center_QSO = os.path.join(os.getcwd(), "data/no_source_in_center/QSO")
 
 
 def removeNAN(img_types_path=galaxy_source_root):
@@ -38,11 +38,14 @@ def removeNAN(img_types_path=galaxy_source_root):
             for f in fits_img:
                 img_dat = fits.getdata(f)
                 x, y = np.where(np.isnan(img_dat))
-                if len(x) > 50:  # drop this sources
+                if len(x) > 100:  # drop this sources
                     shutil.move(src_path, dest)  # here
                     print(f"{f} contains {len(x)} nan pixels, discard this source from dataset")
                     break
 
+
+# removeNAN(img_types_path=quasar_source_root)
+#
 
 def check_have_source_in_center(label_path=quasar_source_root):
     if label_path.endswith("GALAXY"):
@@ -77,4 +80,4 @@ def check_have_source_in_center(label_path=quasar_source_root):
                 shutil.move(src_path, dest)
 
 
-check_have_source_in_center(label_path=star_source_root)
+# check_have_source_in_center(label_path=galaxy_source_root)
