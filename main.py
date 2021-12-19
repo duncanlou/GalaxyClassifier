@@ -1,5 +1,4 @@
 import os
-from functools import partial
 
 import numpy as np
 import torch
@@ -48,10 +47,7 @@ def load_data(data_dir=src_root_path):
     return train_set, test_set
 
 
-num_epochs = 5
-valid_loss_min = np.Inf
-val_loss = []
-val_acc = []
+num_epochs = 10
 
 
 def train_loop(config, checkpoint_dir=None, data_dir=None):
@@ -60,13 +56,11 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
     if torch.cuda.is_available():
         device = "cuda:0"
         if torch.cuda.device_count() > 1:
-            net = nn.DataParallel(net)
+            model = nn.DataParallel(model)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    # optimizer = optim.SGD(model.parameters(), lr=config["lr"], weight_decay=1e-5)
-    optimizer = optim.SGD(model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"],
-                          momentum=config["momentum"])
+    optimizer = optim.SGD(model.parameters(), lr=config["lr"], weight_decay=1e-5)
 
     if checkpoint_dir:
         model_state, optimizer_state = torch.load(os.path.join(checkpoint_dir, "checkpoint"))
@@ -116,7 +110,7 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
             epoch_steps += 1
 
             if batch_idx % 20 == 0:  # print every 20 mini-batches
-                print("[%d, %5d] loss: %.3f" % (epoch + 1, batch_idx + 1,
+                print("[%d, %5d] loss: %.5f" % (epoch + 1, batch_idx + 1,
                                                 running_loss / epoch_steps))
                 running_loss = 0.0
 
@@ -154,7 +148,7 @@ def test_accuracy(net, device='cpu'):
 
     correct = 0
     total = 0
-    net.eval() # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+    net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
     with torch.no_grad():
         for data in testloader:
             images, labels = data
@@ -174,8 +168,6 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0.5):
         "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
         "lr": tune.loguniform(1e-5, 1e-1),
         "batch_size": tune.choice([2, 4, 8, 16, 32, 64, 128]),
-        "weight_decay": tune.loguniform(1e-6, 1e-1),
-        "momentum": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
     }
     scheduler = ASHAScheduler(
         metric="loss",

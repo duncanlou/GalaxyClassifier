@@ -61,4 +61,4 @@ def classify_downloaded_sources(dir):
     print(uncontained_count)
 
 
-classify_downloaded_sources(dir='/mnt/DataDisk/Duncan/images3')
+classify_downloaded_sources(dir='/mnt/DataDisk/Duncan/images10')

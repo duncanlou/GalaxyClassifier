@@ -20,7 +20,7 @@ def getFits(ra, dec):
     return fitsPaths
 
 
-fitsPath = getFits(ra=207.53107, dec=-0.94398367)
+fitsPath = getFits(ra=32.756019, dec=-0.54641856)
 print(fitsPath)
 # for i in range(tab_len):
 #     fitsPath = getFits(T['ra'][i], T['dec'][i])
