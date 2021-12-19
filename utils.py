@@ -16,6 +16,22 @@ kernel = Gaussian2DKernel(x_stddev=1)
 import matplotlib.pyplot as plt
 
 
+def check_if_is_five(source_dir="data/sources/QSO"):
+    root_path = os.path.join(os.getcwd(), source_dir)
+    sources = [os.path.join(root_path, source) for source in os.listdir(root_path)]
+    for s in sources:
+        img_arr = os.listdir(s)
+        if len(img_arr) != 5:
+            print(f"{s} don't have 5 fits files")
+            raise ValueError
+
+    print("check finished")
+
+
+
+
+
+
 def rmnan(filename):
     image = fits.getdata(filename)
     header = fits.getheader(filename)
@@ -36,9 +52,9 @@ def rmnan(filename):
     return image
 
 
-def remove_nan(image_dat):
-    kernel = Gaussian2DKernel(x_stddev=2)
+def remove_nan(image_dat):  # shape: [5, 240, 240]
     row, col = np.where(np.isnan(image_dat))
+    kernel = Gaussian2DKernel(x_stddev=2)
     if len(row) > 0:
         # replace bad data with values interpolated from their neighbors
         image_dat = interpolate_replace_nans(image_dat, kernel)

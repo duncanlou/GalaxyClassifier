@@ -19,21 +19,62 @@ no_source_in_center_galaxy = "/home/duncan/PycharmProjects/MyResearchProject_Dun
 no_source_in_center_star = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/STAR"
 no_source_in_center_QSO = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/QSO"
 
-for root, dirs, fnames in sorted(os.walk(star_source_root, followlinks=True)):  # here
-    for dir in sorted(dirs):
-        src_path = os.path.join(root, dir)
-        fits_img = [os.path.join(src_path, f) for f in os.listdir(src_path)]
-        for f in fits_img:
-            img_dat = fits.getdata(f)
-            x, y = np.where(np.isnan(img_dat))
-            if len(x) > 100:  # drop this sources
-                shutil.move(src_path, too_many_nan_star)  # here
-                print(f"{f} contains {len(x)} nan pixels, discard this source from dataset")
-                break
+
+def removeNAN(img_types_path=galaxy_source_root):
+    if img_types_path.endswith("GALAXY"):
+        dest = too_many_nan_galaxy
+    elif img_types_path.endswith("QSO"):
+        dest = too_many_nan_QSO
+    elif img_types_path.endswith("STAR"):
+        dest = too_many_nan_star
+    else:
+        raise ValueError
+
+    for root, dirs, fnames in sorted(os.walk(img_types_path, followlinks=True)):  # here
+        for dir in sorted(dirs):
+            src_path = os.path.join(root, dir)
+            fits_img = [os.path.join(src_path, f) for f in os.listdir(src_path)]
+
+            for f in fits_img:
+                img_dat = fits.getdata(f)
+                x, y = np.where(np.isnan(img_dat))
+                if len(x) > 50:  # drop this sources
+                    shutil.move(src_path, dest)  # here
+                    print(f"{f} contains {len(x)} nan pixels, discard this source from dataset")
+                    break
+
+
+def check_have_source_in_center(label_path=quasar_source_root):
+    if label_path.endswith("GALAXY"):
+        dest = no_source_in_center_galaxy
+    elif label_path.endswith("QSO"):
+        dest = no_source_in_center_QSO
+    elif label_path.endswith("STAR"):
+        dest = no_source_in_center_star
+    else:
+        raise ValueError
+
+    for root, dirs, fnames in sorted(os.walk(label_path, followlinks=True)):
+        for dir in sorted(dirs):
+            src_path = os.path.join(root, dir)
+            fits_img = [os.path.join(src_path, f) for f in os.listdir(src_path)]
+            image_data_list = [fits.getdata(f) for f in fits_img]
+            fixed_image_list = []
+            for i in range(len(image_data_list)):
+                tmp = remove_nan(image_dat=image_data_list[i])
+                fixed_image_list.append(tmp)
+
+            flags = []
+            for j in range(len(fixed_image_list)):
+                flags.append(have_source_in_center(fixed_image_list[j]))
+
+            flags = np.asarray(flags)
+            if np.any(flags):
+                print(f"{dir} is a valid source!")
             else:
-                img_dat = remove_nan(img_dat)
-            if not have_source_in_center(img_dat):
-                logging.warning(f"{f}: No source has been detected in the image center, discard this "
+                logging.warning(f"{dir}: No source has been detected in the image center, discard this "
                                 f"source from dataset")
-                shutil.move(src_path, no_source_in_center_star)  # here
-                break
+                shutil.move(src_path, dest)
+
+
+check_have_source_in_center(label_path=star_source_root)
