@@ -20,6 +20,8 @@ def check_if_is_five(source_dir="data/sources/QSO"):
     root_path = os.path.join(os.getcwd(), source_dir)
     sources = [os.path.join(root_path, source) for source in os.listdir(root_path)]
     for s in sources:
+        if not os.path.isdir(s):
+            continue
         img_arr = os.listdir(s)
         if len(img_arr) != 5:
             print(f"{s} don't have 5 fits files")
@@ -28,7 +30,7 @@ def check_if_is_five(source_dir="data/sources/QSO"):
     print("check finished")
 
 
-
+# check_if_is_five(source_dir='data/sources/GALAXY')
 
 
 
