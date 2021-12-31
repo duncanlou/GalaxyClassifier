@@ -3,11 +3,7 @@ import os
 from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
-from astropy.convolution import Gaussian2DKernel
 from astropy.io import fits
-
-from astropy.visualization import SinhStretch
-
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
@@ -139,8 +135,6 @@ class FitsImageFolder(DatasetFolder):
             img_list.append(single_channel_img_dat)
 
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
-        strech = SinhStretch()
         img_dat = (img_dat - np.min(img_dat)) / (image_cube_vmax - np.min(img_dat))
-        img_dat = strech.__call__(img_dat)
 
         return img_dat

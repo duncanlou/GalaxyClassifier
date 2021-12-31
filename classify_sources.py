@@ -2,7 +2,6 @@ import os
 import shutil
 
 import astropy.table
-import numpy as np
 
 
 def classify_downloaded_sources(dir):
@@ -61,4 +60,4 @@ def classify_downloaded_sources(dir):
     print(uncontained_count)
 
 
-classify_downloaded_sources(dir='/mnt/DataDisk/Duncan/images10')
+classify_downloaded_sources(dir='/mnt/DataDisk/Duncan/images12')

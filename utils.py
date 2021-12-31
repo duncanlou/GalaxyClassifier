@@ -5,9 +5,8 @@ import shutil
 import astropy.table
 import numpy as np
 import torch
-import torchvision.utils
-from astropy.io import fits
 from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
+from astropy.io import fits
 from astropy.stats import gaussian_fwhm_to_sigma
 from photutils import detect_threshold, detect_sources
 
@@ -16,7 +15,7 @@ kernel = Gaussian2DKernel(x_stddev=1)
 import matplotlib.pyplot as plt
 
 
-def check_if_is_five(source_dir="data/sources/QSO"):
+def check_if_is_five(source_dir="data/sources/GALAXY"):
     root_path = os.path.join(os.getcwd(), source_dir)
     sources = [os.path.join(root_path, source) for source in os.listdir(root_path)]
     for s in sources:
@@ -30,7 +29,7 @@ def check_if_is_five(source_dir="data/sources/QSO"):
     print("check finished")
 
 
-# check_if_is_five(source_dir='data/sources/GALAXY')
+# check_if_is_five()
 
 
 
@@ -150,7 +149,7 @@ def CatPSimgMinMax(img_dat):
     return minflux, maxflux
 
 
-from astropy.visualization import ImageNormalize, MinMaxInterval, SqrtStretch
+from astropy.visualization import ImageNormalize, SqrtStretch
 
 
 def showImages(img):
