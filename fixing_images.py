@@ -44,8 +44,8 @@ def removeNAN(img_types_path=galaxy_source_root):
                     break
 
 
-# removeNAN(img_types_path=quasar_source_root)
-#
+# removeNAN(img_types_path=galaxy_source_root)
+
 
 def check_have_source_in_center(label_path=quasar_source_root):
     if label_path.endswith("GALAXY"):
@@ -80,4 +80,4 @@ def check_have_source_in_center(label_path=quasar_source_root):
                 shutil.move(src_path, dest)
 
 
-# check_have_source_in_center(label_path=galaxy_source_root)
+check_have_source_in_center(label_path=galaxy_source_root)

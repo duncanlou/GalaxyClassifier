@@ -1,7 +1,3 @@
-import os
-
-from astropy.table import Table
-import numpy as np
 from astropy.logger import Logger
 from panstamps.downloader import downloader
 
@@ -20,8 +16,5 @@ def getFits(ra, dec):
     return fitsPaths
 
 
-fitsPath = getFits(ra=32.756019, dec=-0.54641856)
+fitsPath = getFits(ra=140.34763, dec=26.525795)
 print(fitsPath)
-# for i in range(tab_len):
-#     fitsPath = getFits(T['ra'][i], T['dec'][i])
-#     print(i)
