@@ -1,15 +1,23 @@
 import os
 
 import numpy as np
+# from torch and its affiliated packages
 import torch
 import torch.optim as optim
-from ray import tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
+from torch.optim import lr_scheduler
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
+# from ray
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
+# from matplotlib
+import matplotlib.pyplot as plt
 
+from utils import showImages
+
+plt.ion()  # interactive mode
 # import from local project
 from FitsImageFolder import FitsImageFolder
 from models.protoNet import GalaxyNet
@@ -19,12 +27,10 @@ print("torch version: ", torch.__version__)
 src_root_path = os.path.join(os.getcwd(), "data/sources")
 
 
-
-
 def load_data(data_dir=src_root_path):
     tfs = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.CenterCrop(224),
+        transforms.CenterCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(90)
@@ -44,6 +50,9 @@ def load_data(data_dir=src_root_path):
 
 
 num_epochs = 5
+
+
+
 
 
 def train_loop(config, checkpoint_dir=None, data_dir=None):
@@ -88,8 +97,8 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
         running_loss = 0.0
 
         for batch_idx, (images, labels) in enumerate(training_loader):
-            # if batch_idx == 0:
-            #     showImages(images[0])
+            if batch_idx == 0:
+                showImages(images[0])
             images, labels = images.to(device), labels.to(device)
 
             # zero the parameter gradients
@@ -110,7 +119,6 @@ def train_loop(config, checkpoint_dir=None, data_dir=None):
                 print("[%d, %5d] loss: %.5f" % (epoch + 1, batch_idx + 1,
                                                 running_loss / 20))
                 running_loss = 0.0
-
 
         # Validation loss
         val_loss = 0.0

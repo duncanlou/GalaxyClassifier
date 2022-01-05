@@ -4,10 +4,12 @@ from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
 from astropy.io import fits
+from astropy.visualization import ZScaleInterval, LinearStretch
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
 from utils import CatPSimgMinMax, remove_nan
+from torchvision import models
 
 
 def make_dataset(
@@ -124,8 +126,11 @@ class FitsImageFolder(DatasetFolder):
         for i in range(5):
             fits_f = src_dir_contents[i]
             single_channel_img_dat = fits.getdata(os.path.join(source_dir_name, fits_f))
+
+            ################ Step 1. remove nan or np.inf by interplating new value ######################
             single_channel_img_dat = remove_nan(single_channel_img_dat)
 
+            ################ Step 2. CatPSMinMax ######################
             center_region = single_channel_img_dat[100:140, 100:140]
             _, vmax = CatPSimgMinMax(center_region)
             single_channel_img_dat = np.where(single_channel_img_dat > vmax, vmax, single_channel_img_dat)
@@ -135,6 +140,8 @@ class FitsImageFolder(DatasetFolder):
             img_list.append(single_channel_img_dat)
 
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
-        img_dat = (img_dat - np.min(img_dat)) / (image_cube_vmax - np.min(img_dat))
+
+        ############### Step 3. ZScale stretch ######################
+        img_dat = LinearStretch().__call__(ZScaleInterval().__call__(img_dat))
 
         return img_dat
