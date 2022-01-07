@@ -8,8 +8,7 @@ from astropy.visualization import ZScaleInterval, LinearStretch
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
-from utils import CatPSimgMinMax, remove_nan
-from torchvision import models
+from utils import remove_nan
 
 
 def make_dataset(
@@ -131,11 +130,11 @@ class FitsImageFolder(DatasetFolder):
             single_channel_img_dat = remove_nan(single_channel_img_dat)
 
             ################ Step 2. CatPSMinMax ######################
-            center_region = single_channel_img_dat[100:140, 100:140]
-            _, vmax = CatPSimgMinMax(center_region)
-            single_channel_img_dat = np.where(single_channel_img_dat > vmax, vmax, single_channel_img_dat)
-            if vmax > image_cube_vmax:
-                image_cube_vmax = vmax
+            # center_region = single_channel_img_dat[100:140, 100:140]
+            # _, vmax = CatPSimgMinMax(center_region)
+            # single_channel_img_dat = np.where(single_channel_img_dat > vmax, vmax, single_channel_img_dat)
+            # if vmax > image_cube_vmax:
+            #     image_cube_vmax = vmax
 
             img_list.append(single_channel_img_dat)
 
