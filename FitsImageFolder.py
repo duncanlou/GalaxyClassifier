@@ -4,7 +4,6 @@ from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
 from astropy.io import fits
-from astropy.visualization import ZScaleInterval, LinearStretch
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
@@ -38,13 +37,14 @@ def make_dataset(
 
     instances = []
     available_classes = set()
+
     for target_class in sorted(class_to_idx.keys()):
         class_index = class_to_idx[target_class]
         target_dir = os.path.join(directory, target_class)
         if not os.path.isdir(target_dir):
             continue
         for root, dirs, fnames in sorted(os.walk(target_dir, followlinks=True)):
-            for dir in sorted(dirs):
+            for idx, dir in enumerate(sorted(dirs)):
                 path = os.path.join(root, dir)
                 if os.path.isdir(path):
                     item = path, class_index
@@ -141,6 +141,6 @@ class FitsImageFolder(DatasetFolder):
         img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
 
         ############### Step 3. ZScale stretch ######################
-        img_dat = LinearStretch().__call__(ZScaleInterval().__call__(img_dat))
+        # img_dat = LinearStretch().__call__(ZScaleInterval().__call__(img_dat))
 
         return img_dat

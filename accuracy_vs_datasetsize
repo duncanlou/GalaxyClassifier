@@ -1,0 +1,26 @@
+all_dataset_size   train_acc   validation_acc   time_cost       batchsize = 8, model = resnet18(), epoch = 20, Stretch=CatWiseMinMax()
+1k                  90.25%          89%             1m34s
+2k                  90.375%         91.75%          2m35s
+3k                  93.5%           94.0%           3m44s
+4k                  92.7500%        94.1250%        4m45s
+5k                  93.050%         92.5%           5m56s
+6k                  92.7083%        93.8333%        6m58s
+7k                  93.1607%        93.2143%
+8k                  93.5312%        93.25%
+9k                  93.6111%        93.5556%        9m37s
+10k                 93.4875%        93.8%           11m22s
+11k                 93.4318%        93.0909%        11m39s          # changing batchsize from 8 to 64 makes the model much slower to converge, and achieve
+                                                                    #  a worse accuracy. So I changed back the batchsize to 8 again.
+
+12k                 93.4792%        93.5417%        12m09s
+14k                 93.5268%        94.4286%        14m08s
+16k                 94.0547%        93.2813%        16m08s
+18k                 94.0625%        94.4444%        18m25s
+20k                 94.4375%        94.3250%        20m19s
+22k                 94.0795%        93.5455%        21m51s
+25k                 94.35%          93.94%          24m44s
+30k                 94.6125%        94.1167%        29m42s
+62609               94.4038%        94.3056%        76m15s
+
+
+

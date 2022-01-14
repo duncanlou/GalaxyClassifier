@@ -4,11 +4,14 @@ import shutil
 
 import astropy.table
 import numpy as np
+import pandas as pd
+import seaborn as sn
 import torch
 from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
 from astropy.io import fits
 from astropy.stats import gaussian_fwhm_to_sigma
 from photutils import detect_threshold, detect_sources
+from sklearn.metrics import confusion_matrix
 
 kernel = Gaussian2DKernel(x_stddev=1)
 
@@ -29,8 +32,29 @@ def check_if_is_five(source_dir="data/sources/GALAXY"):
     print("check finished")
 
 
-# check_if_is_five()
+check_if_is_five(source_dir="data/test_sources/GALAXY")
 
+
+def build_confusion_matrix(net, y_pred, y_ground_truth, dataloader):
+    # iterate over validation data
+    for inputs, labels in dataloader:
+        output = net(inputs)
+        output = (torch.max(torch.exp(output), 1)[1]).data.cpu().numpy()
+        y_pred.extend(output)
+
+        labels = labels.data.cpu().numpy()
+        y_ground_truth.extend(labels)
+
+        # constant for classes
+        classes = ('GALAXY', 'QSO', 'STAR')
+
+        # Build confusion matrix
+        cf_matrix = confusion_matrix(y_ground_truth, y_pred)
+        df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix) * 10, index=[i for i in classes],
+                             columns=[i for i in classes])
+        plt.figure(figsize=(12, 7))
+        sn.heatmap(df_cm, annot=True)
+        plt.savefig('output.png')
 
 
 def rmnan(filename):
@@ -163,12 +187,14 @@ def showImages(img):
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    im = ax.imshow(color_fits.numpy().transpose((1, 2, 0)), origin='lower', norm=norm)
+    image_to_be_shown = color_fits.numpy().transpose((1, 2, 0))
+    im = ax.imshow(image_to_be_shown, origin='lower', norm=norm)
     fig.colorbar(im)
     plt.show()
 
 
 def have_source_in_center(image_dat):
+    image_dat = image_dat[110:130, 110:130]
     sigma = 3.0 * gaussian_fwhm_to_sigma  # FWHM = 3
     kenl = Gaussian2DKernel(sigma, x_size=3, y_size=3)
     kenl.normalize()
