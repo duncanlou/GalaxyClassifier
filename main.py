@@ -2,11 +2,12 @@ import copy
 import os
 import time
 
+import numpy as np
 import torch
 import torch.optim as optim
 from matplotlib import pyplot as plt
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 from torchvision import transforms, models
 
 # import from local project
@@ -18,50 +19,69 @@ print("torch version: ", torch.__version__)
 src_root_path = os.path.join(os.getcwd(), "data/sources")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(f"using device: {device}")
+torch.cuda.empty_cache()
 
 # Data augmentation and normalization for training
 # Just normalization for validation
-data_transforms = {
-    'train': transforms.Compose([
-        transforms.ToTensor(),
-        transforms.CenterCrop(96),
-        transforms.RandomResizedCrop(80, scale=(0.64, 1.0), ratio=(1.0, 1.0)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(degrees=45)]),
-    'val': transforms.Compose([
-        transforms.ToTensor(),
-    ])
-}
+train_transforms = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomRotation(degrees=45)])
+validation_transforms = transforms.Compose([
+    transforms.ToTensor()
+])
 
 # 加载图像数据集，并在加载的时候对图像施加变换
-dataset = FitsImageFolder(root=src_root_path, transform=data_transforms['train'])
-train_set_size = int(len(dataset) * 0.8)
-validation_set_size = int(len(dataset) * 0.1)
-test_set_size = len(dataset) - train_set_size - validation_set_size
-train_set, validation_set, test_set = random_split(dataset, [train_set_size, validation_set_size, test_set_size])
+dataset_1 = FitsImageFolder(root=src_root_path, transform=train_transforms)
+dataset_2 = FitsImageFolder(root=src_root_path, transform=validation_transforms)
+dataset_3 = FitsImageFolder(root=src_root_path, transform=validation_transforms)
+
+dataset_indices = list(range(len(dataset_1)))
+np.random.shuffle(dataset_indices)
+
+test_split_index = int(np.floor(0.2 * len(dataset_1)))
+val_split_index = int(np.floor(0.2 * (len(dataset_1) - test_split_index))) + test_split_index
+
+test_idx = dataset_indices[:test_split_index]
+val_idx = dataset_indices[test_split_index:val_split_index]
+train_idx = dataset_indices[val_split_index:]
+
+k = 16
+trainset = Subset(dataset_1, train_idx[:int(np.floor(k * 1000))])
+validset = Subset(dataset_2, val_idx[:int(np.floor(k * 250))])
+testset = Subset(dataset_3, test_idx)
 
 training_loader = DataLoader(
-    train_set,
-    batch_size=64,
+    trainset,
+    batch_size=8,
     shuffle=True,
-    num_workers=8
+    num_workers=16
 )
 
 validation_loader = DataLoader(
-    validation_set,
-    batch_size=64,
-    shuffle=True,
-    num_workers=8
+    validset,
+    batch_size=8,
+    shuffle=False,
+    num_workers=4
 )
 
-dataloaders = {'train': training_loader, 'val': validation_loader}
+test_loader = DataLoader(
+    testset,
+    batch_size=8,
+    shuffle=False,
+    num_workers=4
+)
 
-print("Full set size:", len(dataset))
-print("Train set size: ", train_set_size)
-print("Validation set size: ", validation_set_size)
-print("Test set size: ", test_set_size)
+dataloaders = {'train': training_loader, 'val': validation_loader, 'test_loader': test_loader}
 
-class_names = dataset.classes
+print("Full set size:", len(dataset_1))
+print("Train set size: ", len(trainset))
+print("Validation set size: ", len(validset))
+print("Test set size: ", len(testset))
+
+class_names = dataset_1.classes
 print(class_names)
 
 
@@ -77,7 +97,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     print("total_step:", total_step)
 
     for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+        print('Epoch {}/{}'.format(epoch + 1, num_epochs))
         print('-' * 10)
 
         # Each epoch has a training and validation phase
@@ -112,11 +132,11 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 running_corrects += torch.sum(preds == labels.data)
             if phase == 'train':
                 scheduler.step()
-                epoch_loss = running_loss / train_set_size
-                epoch_acc = running_corrects.double() / train_set_size
+                epoch_loss = running_loss / len(trainset)
+                epoch_acc = running_corrects.double() / len(trainset)
             else:
-                epoch_loss = running_loss / validation_set_size
-                epoch_acc = running_corrects.double() / validation_set_size
+                epoch_loss = running_loss / len(validset)
+                epoch_acc = running_corrects.double() / len(validset)
 
             print('{} Loss: {:.6f} Acc: {:.6f}'.format(
                 phase, epoch_loss, epoch_acc))
@@ -136,14 +156,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     return model
 
 
-def test_accuracy(net, device='cpu'):
-    testloader = DataLoader(test_set, batch_size=8, shuffle=False, num_workers=2)
-
+def test_accuracy(net):
+    confusion_matrix = torch.zeros(3, 3)
     correct = 0
     total = 0
     net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
     with torch.no_grad():
-        for data in testloader:
+        for data in test_loader:
             images, labels = data
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
@@ -151,6 +170,12 @@ def test_accuracy(net, device='cpu'):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
+            for t, p in zip(labels.view(-1), predicted.view(-1)):
+                confusion_matrix[t.long(), p.long()] += 1
+
+    print("confusion_matrix: ", confusion_matrix)
+    print(confusion_matrix.diag() / confusion_matrix.sum(1))
+    print("accuracy over all: ", correct / total)
     return correct / total
 
 
@@ -171,7 +196,6 @@ def visualize_model(model, validation_dataloader, num_images=9):
             for j in range(inputs.size()[0]):
                 images_so_far += 1
                 ax = plt.subplot(num_images // 3, 3, images_so_far)
-                ax.aixs('off')
                 ax.set_title('predicted: {}'.format(class_names[preds[j]]))
                 utils.showImages(inputs.cpu().data[j])
 
@@ -181,21 +205,19 @@ def visualize_model(model, validation_dataloader, num_images=9):
         model.train(mode=was_training)
 
 
-model_ft = models.resnext101_32x8d(pretrained=True)
-
-weight = model_ft.conv1.weight.clone()
-
-model_ft.conv1 = nn.Sequential(nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3), nn.BatchNorm2d(64),
-                               nn.ReLU(),
-                               nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+model_ft = models.resnet18(pretrained=True)
+model_ft.conv1 = nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3)
 num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, len(class_names))
-model_ft = model_ft.to(device)
+
 criterion = nn.CrossEntropyLoss()
+
+model_ft = model_ft.to(device)
 # Observe that all parameters are being optimized
 optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25)
-visualize_model(model_ft, validation_dataloader=validation_loader)
+model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=20)
+# test_accuracy(model_ft)
+# visualize_model(model_ft, validation_dataloader=validation_loader)
