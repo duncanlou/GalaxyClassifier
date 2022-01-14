@@ -44,7 +44,7 @@ def removeNAN(img_types_path=galaxy_source_root):
                     break
 
 
-# removeNAN(img_types_path=star_source_root)
+removeNAN(img_types_path=quasar_source_root)
 
 
 def check_have_source_in_center(label_path=quasar_source_root):
@@ -79,16 +79,4 @@ def check_have_source_in_center(label_path=quasar_source_root):
                                 f"source from dataset")
                 shutil.move(src_path, dest)
 
-
-fits_list = os.listdir(
-    "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/no_source_in_center/GALAXY/161.65898p66.093953")
-flags = []
-for fits_f in fits_list:
-    path = os.path.join(no_source_in_center_galaxy, "161.65898p66.093953", fits_f)
-    image_data = fits.getdata(path)
-    b = have_source_in_center(image_data)
-    flags.append(b)
-
-print(flags)
-
-# check_have_source_in_center(label_path=galaxy_source_root)
+# check_have_source_in_center(label_path="/mnt/DataDisk/Duncan/images44/STAR")

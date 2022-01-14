@@ -48,7 +48,7 @@ test_idx = dataset_indices[:test_split_index]
 val_idx = dataset_indices[test_split_index:val_split_index]
 train_idx = dataset_indices[val_split_index:]
 
-k = 16
+k = 20
 trainset = Subset(dataset_1, train_idx[:int(np.floor(k * 1000))])
 validset = Subset(dataset_2, val_idx[:int(np.floor(k * 250))])
 testset = Subset(dataset_3, test_idx)

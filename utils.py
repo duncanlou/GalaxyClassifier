@@ -32,7 +32,7 @@ def check_if_is_five(source_dir="data/sources/GALAXY"):
     print("check finished")
 
 
-check_if_is_five(source_dir="data/test_sources/GALAXY")
+# check_if_is_five(source_dir="data/test_sources/GALAXY")
 
 
 def build_confusion_matrix(net, y_pred, y_ground_truth, dataloader):
