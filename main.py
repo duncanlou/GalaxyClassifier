@@ -50,6 +50,8 @@ train_idx = dataset_indices[val_split_index:]
 
 k = 20
 trainset = Subset(dataset_1, train_idx[:int(np.floor(k * 1000))])
+# trainset = Subset(dataset_1, train_idx)
+# validset = Subset(dataset_2, val_idx)
 validset = Subset(dataset_2, val_idx[:int(np.floor(k * 250))])
 testset = Subset(dataset_3, test_idx)
 
@@ -64,14 +66,14 @@ validation_loader = DataLoader(
     validset,
     batch_size=8,
     shuffle=False,
-    num_workers=4
+    num_workers=8
 )
 
 test_loader = DataLoader(
     testset,
     batch_size=8,
-    shuffle=False,
-    num_workers=4
+    shuffle=True,
+    num_workers=8
 )
 
 dataloaders = {'train': training_loader, 'val': validation_loader, 'test_loader': test_loader}
@@ -110,15 +112,26 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             running_loss = 0.0
             running_corrects = 0
 
-            for inputs, labels in dataloaders[phase]:
+            for i, (inputs, labels) in enumerate(dataloaders[phase]):
                 inputs, labels = inputs.to(device), labels.to(device)
-
+                # inputs.shape = (8, 5, 240, 240), labels.shape = (8,)
                 optimizer.zero_grad()
 
                 # forward
                 # track history if only in train
+
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
+                    # outputs.shape = (8, 3), looks like below:
+                    # tensor([[-0.9669, 0.1060, -0.0951],
+                    #         [-0.8292, 1.1135, -0.4336],
+                    #         [-0.8459, 0.3798, -0.5044],
+                    #         [-0.7668, 0.5464, -0.1321],
+                    #         [-0.6945, 0.4186, -0.3601],
+                    #         [-0.6203, 0.5930, 0.0504],
+                    #         [-0.6348, 0.5252, 0.0493],
+                    #         [-1.1363, 0.7513, -0.1114]], device='cuda:0',
+                    #        grad_fn= < AddmmBackward0 >)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
 
@@ -151,6 +164,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
+
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
@@ -162,8 +176,7 @@ def test_accuracy(net):
     total = 0
     net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
     with torch.no_grad():
-        for data in test_loader:
-            images, labels = data
+        for i, (images, labels) in enumerate(test_loader):
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
             _, predicted = torch.max(outputs.data, 1)
@@ -206,7 +219,16 @@ def visualize_model(model, validation_dataloader, num_images=9):
 
 
 model_ft = models.resnet18(pretrained=True)
+# We have access to all the modules, layers, and their parameters, we can easily freeze them by setting
+# the parameters'requires_grad flag to False. This would prevent calculating the gradients for these parameters
+# in the backward step which in turn prevents the optimizer from updating them.
+# for param in model_ft.parameters():
+#     param.requires_grad = False
+# replace the conv1 (keep its weights)
 model_ft.conv1 = nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3)
+# nn.init.xavier_uniform_(model_ft.conv1.weight)
+
+# replace the output layer
 num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, len(class_names))
 
@@ -218,6 +240,6 @@ optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=20)
-# test_accuracy(model_ft)
+model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=10)
+test_accuracy(model_ft)
 # visualize_model(model_ft, validation_dataloader=validation_loader)
