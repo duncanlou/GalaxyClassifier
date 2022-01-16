@@ -4,7 +4,6 @@ from typing import Dict, Optional, Callable, List, Tuple
 
 import numpy as np
 from astropy.io import fits
-from astropy.visualization import SqrtStretch
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
@@ -143,6 +142,5 @@ class FitsImageFolder(DatasetFolder):
 
         ############### Step 3. ZScale stretch ######################
         # img_dat = LinearStretch().__call__(ZScaleInterval().__call__(img_dat))
-        img_dat = SqrtStretch().__call__(img_dat)
 
         return img_dat

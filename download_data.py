@@ -16,5 +16,5 @@ def getFits(ra, dec):
     return fitsPaths
 
 
-fitsPath = getFits(ra=140.34763, dec=26.525795)
+fitsPath = getFits(10.838543, 13.991331)
 print(fitsPath)

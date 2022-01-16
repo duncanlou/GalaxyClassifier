@@ -1,7 +1,7 @@
 all_dataset_size   train_acc   validation_acc   time_cost       batchsize = 8, model = resnet18(), epoch = 20, Stretch=CatWiseMinMax()
 1k                  90.25%          89%             1m34s
 2k                  90.375%         91.75%          2m35s
-3k                  93.5%           94.0%           3m44s
+3k                  93.5%           90.40%           3m44s
 4k                  92.7500%        94.1250%        4m45s
 5k                  93.050%         92.5%           5m56s
 6k                  92.7083%        93.8333%        6m58s
