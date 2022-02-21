@@ -1,5 +1,6 @@
 import copy
 import os
+import sqlite3
 import time
 
 import numpy as np
@@ -15,6 +16,11 @@ import utils
 from FitsImageFolder import FitsImageFolder
 
 print("torch version: ", torch.__version__)
+
+connection = sqlite3.connect("SDSS_sources.db")
+print("database", connection.total_changes)
+
+# SDSS_cat = Table.read("SDSS_33col.tbl", format='ipac')
 
 src_root_path = os.path.join(os.getcwd(), "data/sources")
 
