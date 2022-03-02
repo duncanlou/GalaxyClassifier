@@ -81,7 +81,7 @@ def train_model(config, checkpoint_dir=None, data_dir=None):
     optimizer = optim.SGD(model.parameters(), lr=config["lr"], momentum=0.9)
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.0001)
-    num_epochs = 25
+    num_epochs = 5
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0

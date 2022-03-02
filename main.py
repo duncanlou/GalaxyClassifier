@@ -1,6 +1,5 @@
 import copy
 import os
-import sqlite3
 import time
 
 import numpy as np
@@ -9,18 +8,15 @@ import torch.optim as optim
 from matplotlib import pyplot as plt
 from torch import nn
 from torch.utils.data import DataLoader, Subset
-from torchvision import transforms, models
+from torchvision import transforms
 
 # import from local project
 import utils
 from FitsImageFolder import FitsImageFolder
+from LouNet import louNet
 
 print("torch version: ", torch.__version__)
 
-connection = sqlite3.connect("SDSS_sources.db")
-print("database", connection.total_changes)
-
-# SDSS_cat = Table.read("SDSS_33col.tbl", format='ipac')
 
 src_root_path = os.path.join(os.getcwd(), "data/sources")
 
@@ -47,18 +43,15 @@ dataset_3 = FitsImageFolder(root=src_root_path, transform=validation_transforms)
 dataset_indices = list(range(len(dataset_1)))
 np.random.shuffle(dataset_indices)
 
-test_split_index = int(np.floor(0.2 * len(dataset_1)))
-val_split_index = int(np.floor(0.2 * (len(dataset_1) - test_split_index))) + test_split_index
+test_split_index = int(np.floor(0.1 * len(dataset_1)))
+val_split_index = int(np.floor(0.1 * (len(dataset_1) - test_split_index))) + test_split_index
 
 test_idx = dataset_indices[:test_split_index]
 val_idx = dataset_indices[test_split_index:val_split_index]
 train_idx = dataset_indices[val_split_index:]
 
-k = 20
-trainset = Subset(dataset_1, train_idx[:int(np.floor(k * 1000))])
-# trainset = Subset(dataset_1, train_idx)
-# validset = Subset(dataset_2, val_idx)
-validset = Subset(dataset_2, val_idx[:int(np.floor(k * 250))])
+trainset = Subset(dataset_1, train_idx)
+validset = Subset(dataset_2, val_idx)
 testset = Subset(dataset_3, test_idx)
 
 training_loader = DataLoader(
@@ -128,16 +121,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
-                    # outputs.shape = (8, 3), looks like below:
-                    # tensor([[-0.9669, 0.1060, -0.0951],
-                    #         [-0.8292, 1.1135, -0.4336],
-                    #         [-0.8459, 0.3798, -0.5044],
-                    #         [-0.7668, 0.5464, -0.1321],
-                    #         [-0.6945, 0.4186, -0.3601],
-                    #         [-0.6203, 0.5930, 0.0504],
-                    #         [-0.6348, 0.5252, 0.0493],
-                    #         [-1.1363, 0.7513, -0.1114]], device='cuda:0',
-                    #        grad_fn= < AddmmBackward0 >)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
 
@@ -224,20 +207,7 @@ def visualize_model(model, validation_dataloader, num_images=9):
         model.train(mode=was_training)
 
 
-model_ft = models.resnet18(pretrained=True)
-# We have access to all the modules, layers, and their parameters, we can easily freeze them by setting
-# the parameters'requires_grad flag to False. This would prevent calculating the gradients for these parameters
-# in the backward step which in turn prevents the optimizer from updating them.
-# for param in model_ft.parameters():
-#     param.requires_grad = False
-# replace the conv1 (keep its weights)
-model_ft.conv1 = nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3)
-# nn.init.xavier_uniform_(model_ft.conv1.weight)
-
-# replace the output layer
-num_ftrs = model_ft.fc.in_features
-model_ft.fc = nn.Linear(num_ftrs, len(class_names))
-
+model_ft = louNet
 criterion = nn.CrossEntropyLoss()
 
 model_ft = model_ft.to(device)
@@ -248,4 +218,19 @@ exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.
 
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=10)
 test_accuracy(model_ft)
+
+# model_ft = models.resnet18(pretrained=True)
+# We have access to all the modules, layers, and their parameters, we can easily freeze them by setting
+# the parameters'requires_grad flag to False. This would prevent calculating the gradients for these parameters
+# in the backward step which in turn prevents the optimizer from updating them.
+# for param in model_ft.parameters():
+#     param.requires_grad = False
+# replace the conv1 (keep its weights)
+# model_ft.conv1 = nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3)
+# nn.init.xavier_uniform_(model_ft.conv1.weight)
+# replace the output layer
+# num_ftrs = model_ft.fc.in_features
+# model_ft.fc = nn.Linear(num_ftrs, len(class_names))
+
+
 # visualize_model(model_ft, validation_dataloader=validation_loader)
