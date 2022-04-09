@@ -5,7 +5,7 @@ import astropy.table
 
 
 def classify_downloaded_sources(dir):
-    T = astropy.table.Table.read("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/DuncanSDSSdata.tbl",
+    T = astropy.table.Table.read("/home/duncan/PycharmProjects/1XSDSS_DR16/data/DuncanSDSSdata.tbl",
                                  format='ipac')
     ralist = list(T['ra'])
     declist = list(T['dec'])
