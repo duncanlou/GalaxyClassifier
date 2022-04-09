@@ -13,7 +13,7 @@ from torchvision import transforms
 # import from local project
 import utils
 from FitsImageFolder import FitsImageFolder
-from LouNet import louNet
+from LouNet import LouNet
 
 print("torch version: ", torch.__version__)
 
@@ -58,7 +58,7 @@ training_loader = DataLoader(
     trainset,
     batch_size=8,
     shuffle=True,
-    num_workers=16
+    num_workers=0
 )
 
 validation_loader = DataLoader(
@@ -112,6 +112,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             running_corrects = 0
 
             for i, (inputs, labels) in enumerate(dataloaders[phase]):
+                print("aaa")
                 inputs, labels = inputs.to(device), labels.to(device)
                 # inputs.shape = (8, 5, 240, 240), labels.shape = (8,)
                 optimizer.zero_grad()
@@ -207,7 +208,7 @@ def visualize_model(model, validation_dataloader, num_images=9):
         model.train(mode=was_training)
 
 
-model_ft = louNet
+model_ft = LouNet()
 criterion = nn.CrossEntropyLoss()
 
 model_ft = model_ft.to(device)

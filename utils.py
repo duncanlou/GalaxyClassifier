@@ -87,7 +87,7 @@ def remove_nan(image_dat):  # shape: [5, 240, 240]
 
 
 def classify_downloaded_sources(dir):
-    T = astropy.table.Table.read("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/DuncanSDSSdata.tbl",
+    T = astropy.table.Table.read("/home/duncan/PycharmProjects/1XSDSS_DR16/data/DuncanSDSSdata.tbl",
                                  format='ipac')
     ralist = list(T['ra'])
     declist = list(T['dec'])
@@ -118,11 +118,11 @@ def classify_downloaded_sources(dir):
                 print(label)
                 contained_count += 1
                 if label == 'GALAXY':
-                    dest_folder = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/sources/GALAXY"
+                    dest_folder = "/home/duncan/PycharmProjects/1XSDSS_DR16/data/sources/GALAXY"
                 if label == 'QSO':
-                    dest_folder = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/sources/QSO"
+                    dest_folder = "/home/duncan/PycharmProjects/1XSDSS_DR16/data/sources/QSO"
                 if label == 'STAR':
-                    dest_folder = "/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/sources/STAR"
+                    dest_folder = "/home/duncan/PycharmProjects/1XSDSS_DR16/data/sources/STAR"
 
                 shutil.move(src=full_src_path, dst=dest_folder)
 
