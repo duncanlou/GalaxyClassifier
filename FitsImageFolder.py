@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import Dict, Optional, Callable, List, Tuple
 
@@ -8,11 +7,12 @@ from astropy.table import Table
 from torchvision.datasets import DatasetFolder
 from torchvision.datasets.folder import find_classes
 
-from utils import remove_nan, CatPSimgMinMax
+from utils import remove_nan, cal_luptitude, CatPSimgMinMax
 
-wise_cat = Table.read('data/wise_cat.tbl', format='ipac')
-fluxes = list(zip(list(wise_cat['w1flux']), list(wise_cat['w2flux']), list(wise_cat['w3flux'])))
-radecs = list(zip(list(wise_cat['ra']), list(wise_cat['dec'])))
+T = Table.read('data/SDSSxWISE_cat.tbl', format='ipac')
+source_id_col = list(T['source_id'])
+w1flux = T['w1flux']
+w2flux = T['w2flux']
 
 
 def make_dataset(
@@ -118,52 +118,52 @@ class FitsImageFolder(DatasetFolder):
         return make_dataset(directory, class_to_idx, extensions=extensions, is_valid_file=is_valid_file)
 
     @staticmethod
-    def __fits_loader(dir):
-        src_dir_contents = os.listdir(dir)
-        if len(src_dir_contents) != 5:
-            logging.error(f"{dir} must contain 5 fits files, current is {len(src_dir_contents)}")
-            raise IOError
+    def __fits_loader(fits_name):
+        src_dir_contents = os.listdir(fits_name)
         src_dir_contents.sort()
 
-        if dir.__contains__('m'):
-            ra = dir.split('m')[0]
-            dec = "-" + dir.split('m')[1]
-        elif dir.__contains__('p'):
-            ra = dir.split('p')[0]
-            dec = dir.split('p')[1]
-        else:
-            raise IOError
-
-        ra = float(ra)
-        dec = float(dec)
-        idx = radecs.index((ra, dec))
-        raw_flux = fluxes[idx]
-        w1flux = raw_flux[0]
-        w2flux = raw_flux[1]
-        w3flux = raw_flux[2]
-        np.log10()
-
+        paths = fits_name.split(os.path.sep)
+        short_name = paths[-1]
+        idx = source_id_col.index(short_name)
+        w1flux_single_source = w1flux[idx]
+        w2flux_single_source = w2flux[idx]
+        m1, m2 = cal_luptitude(w1flux_single_source, w2flux_single_source)
+        wise_magnitude_info = np.asarray([m1, m2])
         img_list = []
-        image_cube_vmax = 0
+        # for i in range(5):
+        #     fits_image = src_dir_contents[i]
+        #     img_path = os.path.join(fits_name, fits_image)
+        #     raw_data = fits.getdata(img_path)
+        #     single_band_img_dat = remove_nan(raw_data)
+        #     img_list.append(single_band_img_dat)
+
+        # img_dat = np.stack(img_list, axis=2)
+        # img_dat = optimize_image(img_dat)
+        # img_dat = normalize(img_dat)
+
+        # image_cube_vmax = 0
+
         for i in range(5):
             fits_f = src_dir_contents[i]
-            single_channel_img_dat = fits.getdata(os.path.join(dir, fits_f))
+            single_channel_img_dat = fits.getdata(os.path.join(fits_name, fits_f)).squeeze()
 
             ################ Step 1. remove nan or np.inf by interplating new value ######################
             single_channel_img_dat = remove_nan(single_channel_img_dat)
 
             ################ Step 2. CatPSMinMax ######################
-            center_region = single_channel_img_dat[100:140, 100:140]
-            _, vmax = CatPSimgMinMax(center_region)
-            single_channel_img_dat = np.where(single_channel_img_dat > vmax, vmax, single_channel_img_dat)
-            if vmax > image_cube_vmax:
-                image_cube_vmax = vmax
+            scaleVmin, scaleVmax = CatPSimgMinMax(single_channel_img_dat)
+            single_channel_img_dat = np.where(single_channel_img_dat > scaleVmax, scaleVmax, single_channel_img_dat)
+
+            ################ Step 3. Min-Max Scaling ######################
+            vmin = np.min(single_channel_img_dat)
+            vmax = np.max(single_channel_img_dat)
+            single_channel_img_dat = (single_channel_img_dat - vmin) / (vmax - vmin)
+
+            # if vmax > image_cube_vmax:
+            #     image_cube_vmax = vmax
 
             img_list.append(single_channel_img_dat)
 
-        img_dat = np.stack(img_list, axis=2)  # img_dat.shape: (240, 240, 5)
+        img_dat = np.stack(img_list, axis=2)
 
-        ############### Step 3. ZScale stretch ######################
-        # img_dat = LinearStretch().__call__(ZScaleInterval().__call__(img_dat))
-
-        return img_dat
+        return img_dat, wise_magnitude_info

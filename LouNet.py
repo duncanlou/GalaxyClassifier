@@ -49,7 +49,7 @@ class LouNet(nn.Module):
                 blk.append(ResBlock(num_channels, num_channels))
         return blk
 
-    def forward(self, input, w1w2w3):
+    def forward(self, input):
         output = self.b1(input)
         output = self.b2(output)
         output = self.b3(output)
@@ -57,7 +57,6 @@ class LouNet(nn.Module):
         output = self.b5(output)
         output = F.adaptive_avg_pool2d(output, (1, 1))
         output = torch.flatten(output)
-        output = torch.cat((output, w1w2w3))
         output = self.fc1(output)
         output = F.relu(output)
         output = self.fc2(output)
