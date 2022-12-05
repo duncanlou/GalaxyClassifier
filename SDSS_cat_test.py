@@ -1,3 +1,6 @@
-from astropy.table import Table
+from astroquery.cadc import Cadc
 
-T = Table.read("data/Duncan_SDSS_cleaned_cat.tbl", format="ipac")
+if __name__ == '__main__':
+    cadc = Cadc()
+    for collection, details in sorted(cadc.get_collections().items()):
+        print(f'{collection} : {details}')

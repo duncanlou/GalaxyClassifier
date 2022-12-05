@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import shutil
 
@@ -6,10 +7,11 @@ import astropy.table
 import numpy as np
 import pandas as pd
 import seaborn as sn
+import skimage.exposure as skie
 import torch
 from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
 from astropy.io import fits
-from astropy.stats import gaussian_fwhm_to_sigma
+from astropy.stats import gaussian_fwhm_to_sigma, sigma_clip
 from photutils import detect_threshold, detect_sources
 from sklearn.metrics import confusion_matrix
 
@@ -134,28 +136,71 @@ def classify_downloaded_sources(dir):
     print(uncontained_count)
 
 
-def get_fits_dict(imgs, source_dir):
-    if len(imgs) != 5:
-        logging.error(f"{source_dir_name} must contain 5 fits files, current is {len(img_list)}")
-        raise IOError
+# m = -2.5/ln(10) * [asinh((f/f0)/(2b)) + ln(b)].
+# f0 in w1,w2,w3,w4:  306.681, 170.663, 29.0448, 8.2839  (Wright, Eisenhardt, etc, 2010)
+# b for w1, w2: 0.1480469, 1.0154278
+def cal_luptitude(w1flux, w2flux):  # shape: [16, 4]
+    f0_w1 = 306.681
+    f0_w2 = 170.663
+    b_w1 = 0.148
+    b_w2 = 1.015
 
-    fits_dict = {}
+    tmp1 = (w1flux / f0_w1) / (2 * b_w1)
+    tmp2 = (w2flux / f0_w2) / (2 * b_w2)
 
-    for f in imgs:
-        if f.startswith("stack_g"):
-            fits_dict[0] = os.path.join(source_dir, f)
-        elif f.startswith("stack_r"):
-            fits_dict[1] = os.path.join(source_dir, f)
-        elif f.startswith("stack_i"):
-            fits_dict[2] = os.path.join(source_dir, f)
-        elif f.startswith("stack_z"):
-            fits_dict[3] = os.path.join(source_dir, f)
-        elif f.startswith("stack_y"):
-            fits_dict[4] = os.path.join(source_dir, f)
-        else:
-            raise ValueError
+    tmp3 = math.asinh(tmp1) + np.log(b_w1)
+    tmp4 = math.asinh(tmp2) + np.log(b_w2)
 
-    return fits_dict
+    m1 = -2.5 / np.log(10) * tmp3
+    m2 = -2.5 / np.log(10) * tmp4
+
+    return m1, m2
+
+
+def optimize_image(image_data):
+    limg = np.arcsinh(image_data)
+    limg = limg / limg.max()
+    low, high = np.percentile(limg, (0.25, 99.5))
+    opt_img = skie.exposure.rescale_intensity(limg, in_range=(low, high))
+    return opt_img
+
+
+def append_new_line(file_name, text_to_append):
+    """Append given text as a new line at the end of file"""
+    # Open the file in append & read mode ('a+')
+    with open(file_name, "a+") as file_object:
+        # Move read cursor to the start of file.
+        file_object.seek(0)
+        # If file is not empty then append '\n'
+        data = file_object.read(100)
+        if len(data) > 0:
+            file_object.write("\n")
+        # Append text at the end of file
+        file_object.write(text_to_append)
+
+
+def get_sigma_clip(img, sigma=3, iters=100):
+    """
+    Do sigma clipping on the raw images to improve constrast of
+    target regions.
+
+    Reference
+    =========
+    [1] sigma clip
+        http://docs.astropy.org/en/stable/api/astropy.stats.sigma_clip.html
+    """
+    img_clip = sigma_clip(img, sigma=sigma, maxiters=iters)
+    img_mask = img_clip.mask.astype(float)
+    img_new = img * img_mask
+
+    return img_new
+
+
+def normalize(img):
+    vmax = np.max(img)
+    vmin = np.min(img)
+    img = (img - vmin) / (vmax - vmin)
+    return img
 
 
 def CatPSimgMinMax(img_dat):

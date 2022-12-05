@@ -2,23 +2,15 @@ import os
 
 from astropy.table import Table
 
-filename = "SDSS_9col.tbl"
+from download_data import getFits
 
-table = Table.read(filename, format='ipac')
-ras = list(table['ra'])
-decs = list(table['dec'])
-zwarnings = list(table['zwarning'])
+T = Table.read("data/SDSS_Xmatch_QSO.csv", format="csv")
+ra_col = T['ra']
+dec_col = T['dec']
+positions = list(zip(ra_col, dec_col))
 
-coords = list(zip(ras, decs))
-
-zwarning_dict = {}
-
-for i in range(len(coords)):
-    zwarning_dict[coords[i]] = zwarnings[i]
-
-gal_dir = "data/no_source_in_center/GALAXY"
-star_dir = "data/no_source_in_center/STAR"
-QSO_dir = "data/no_source_in_center/QSO"
+QSO_dir = "/mnt/DataDisk/Duncan/qusars_newly_download"
+old_QSO_dir = "data/sources/QSO"
 
 
 def getDatasetsCoords(data_path):
@@ -27,39 +19,40 @@ def getDatasetsCoords(data_path):
     for c in f_names:
         if c.__contains__('p'):
             ra, dec = c.split('p')
-            celes_bodies.append((float(ra), float(dec)))
-        if c.__contains__('m'):
+        elif c.__contains__('m'):
             ra, dec = c.split('m')
             dec = '-' + dec
-            celes_bodies.append((float(ra), float(dec)))
         else:
-            continue
+            raise ValueError
+        ra, dec = float(ra), float(dec)
+        ra, dec = round(ra, 5), round(dec, 6)
+        celes_bodies.append((ra, dec))
     return celes_bodies
 
 
-galaxy_coords = getDatasetsCoords(gal_dir)
-star_coords = getDatasetsCoords(star_dir)
-qso_coords = getDatasetsCoords(QSO_dir)
+already_downloaded = getDatasetsCoords(QSO_dir)
 
-zw_0 = []
-zw_5 = []
-zw_16 = []
-trainset_zwarning = []
+qso_coords = getDatasetsCoords(old_QSO_dir)
+print(f"qso training size: {len(qso_coords)}")
+count = 0
 
-
-def check_datasets_zwarning(dataset_coords):
-    for i in range(len(dataset_coords)):
-        key = dataset_coords[i]
-        zwaring = zwarning_dict[key]
-        trainset_zwarning.append(zwaring)
-        if zwaring == 0:
-            zw_0.append(key)
-        elif zwaring == 16:
-            zw_16.append(key)
-        elif zwaring == 5:
-            zw_5.append(key)
+for i in range(10000):
+    print(f"i={i}")
+    coord = positions[i]
+    if already_downloaded.__contains__(coord):
+        count += 1
+        continue
+    if not qso_coords.__contains__(coord):
+        count += 1
+        print(f"正在下载第{count}个新的类星体")
+        ra = round(coord[0], 5)
+        dec = round(coord[1], 6)
+        if dec < 0:
+            ra = str(ra)
+            dec = str(-dec)
+            dir_name = os.path.join(QSO_dir, f"{ra}m{dec}")
         else:
-            pass
-
-
-check_datasets_zwarning(galaxy_coords)
+            ra = str(ra)
+            dec = str(dec)
+            dir_name = os.path.join(QSO_dir, f"{ra}p{dec}")
+        fitsPath = getFits(ra, dec, dir_name)
