@@ -5,7 +5,9 @@ import time
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import Adam
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -16,7 +18,8 @@ from utils import append_new_line
 from xmatch_dataset import XMatchDataset
 
 OPT_SOURCE_CLASSIFICATION_MODEL_PATH = "models/opt_classification_model_wts.pt"
-RADIO_MODEL_PATH = "models/crossmatch_model_wts.pt"
+RADIO_MODEL_PATH = "models/RGZ_all_negative_crossmatch_model_wts.pt"
+
 VLASS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/VLASS_training_data"
 PS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/PS_training_data"
 
@@ -32,8 +35,8 @@ lr = 3e-5
 gamma = 0.7
 seed = 42
 
-training_note_file = "training_notes/crossmatch_model_training_notes3.txt"
-testing_note_file = "training_notes/Norris06_data_test_notes.txt"
+training_note_file = "training_notes/RGZ_all_negative_training_notes"
+testing_note_file = "training_notes/RGZ_all_negative_Norris_testing_notes.csv"
 
 append_new_line(training_note_file,
                 "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
@@ -72,7 +75,8 @@ def create_testData():
     testDataset = FitsImageSet(radio_root_dir=VLASS_IMAGE_ROOT,
                                opt_root_dir=PS_IMAGE_ROOT,
                                ps_positive_samples_csv="../data/preprocessed_cat/PS_p_Norris06_samples.csv",
-                               ps_negative_samples_csv="../data/preprocessed_cat/PS_n_Norris06_samples.csv")
+                               ps_negative_samples_csv="../data/preprocessed_cat/PS_n_Norris06_samples.csv",
+                               )
     testData = XMatchDataset(testDataset, radio_transform=radio_transform['val'], opt_transform=opt_transform)
     indices = list(range(len(testData)))
     np.random.shuffle(indices)
@@ -82,8 +86,8 @@ def create_testData():
 
 whole_dataset = FitsImageSet(radio_root_dir=VLASS_IMAGE_ROOT,
                              opt_root_dir=PS_IMAGE_ROOT,
-                             ps_positive_samples_csv="../data/preprocessed_cat/PS_p_ROGUE_samples.csv",
-                             ps_negative_samples_csv="../data/preprocessed_cat/PS_n_ROGUE_samples.csv")
+                             ps_positive_samples_csv="../data/preprocessed_cat/PS_p_RGZ_samples.csv",
+                             ps_negative_samples_csv="../data/preprocessed_cat/PS_n_samples_RGZ_all.csv")
 trainData = XMatchDataset(whole_dataset, radio_transform=radio_transform['train'], opt_transform=opt_transform)
 validationData = XMatchDataset(whole_dataset, radio_transform=radio_transform['val'], opt_transform=opt_transform)
 
@@ -110,16 +114,15 @@ train_loader = DataLoader(
 
 validation_loader = DataLoader(
     validset,
-    batch_size=1,
+    batch_size=8,
     shuffle=True,
-    num_workers=2
+    num_workers=8
 )
 
 test_loader = DataLoader(
     testset,
     batch_size=1,
     shuffle=False,
-    num_workers=2
 )
 
 dataloaders = {'train': train_loader, 'val': validation_loader, 'test': test_loader}
@@ -297,18 +300,19 @@ def set_radio_model():
 
 if __name__ == '__main__':
     ps_model = set_ps_model()
-    radio_model = set_radio_model()
+    # radio_model = set_radio_model()
+    # append_new_line(testing_note_file,
+    #                 "VLASS_component_name, PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
+    # test_accuracy(ps_model, radio_model)
+
+    x_model = RadioOpticalCrossmatchModel().to(device)
+
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = Adam(x_model.parameters(), lr=0.001, weight_decay=0.0001)
+
+    model_ft = train_model(ps_model, x_model, loss_fn, optimizer, num_epochs=10)
+
     append_new_line(testing_note_file,
                     "PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
-    test_accuracy(ps_model, radio_model)
 
-    # x_model = RadioOpticalCrossmatchModel().to(device)
-    #
-    # loss_fn = nn.CrossEntropyLoss()
-    # optimizer = Adam(x_model.parameters(), lr=0.001, weight_decay=0.0001)
-    #
-    # model_ft = train_model(ps_model, x_model, loss_fn, optimizer, num_epochs=10)
-    #
-    # append_new_line(testing_note_file, "PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
-    #
-    # test_accuracy(ps_model, model_ft)
+    test_accuracy(ps_model, model_ft)

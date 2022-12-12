@@ -29,11 +29,11 @@ class FitsImageSet(Dataset):
         self.ps_p_samples = pd.read_csv(ps_positive_samples_csv)
 
         self.ps_n_samples = pd.read_csv(ps_negative_samples_csv)
-        self.ps_n_samples = self.ps_n_samples.groupby("VLASS_component_name").first().reset_index()
+
 
         self.df_samples = pd.concat([self.ps_p_samples, self.ps_n_samples], ignore_index=True)
+        self.ps_n_samples = self.df_samples.groupby("VLASS_component_name")
         self.df_samples = self.df_samples.sample(frac=1)
-        # self.T_samples = Table.from_pandas(self.df_samples)
 
         self.radio_transform = radio_transform
         self.opt_transform = opt_transform
@@ -91,13 +91,14 @@ class FitsImageSet(Dataset):
         ps_imgcube = self.create_imgcube(ps_img_list)
 
         cutout_position_info = cutouts_for_one_PS_source[0].position_original
+        (cutout_centerX, cutout_centerY) = cutouts_for_one_PS_source[0].center_original
+        distant_r = (432 - cutout_centerX) ** 2 + (432 - cutout_centerY) ** 2
+        distant_r = distant_r ** 0.5
+        cutout_position_info = cutout_position_info + (distant_r,)
         cutout_position_info = np.asarray(cutout_position_info)
 
-        label = opt_sample["PS_class"]
-        if label == 'P':
-            label = 1
-        else:
-            label = 0
+        raw_label = opt_sample["PS_class"]
+        label = 1 if raw_label == 'P' else 0
 
         ps_id = opt_sample['Pan-STARRS_objID']
         ps_ra = opt_sample['Pan-STARRS_RAJ2000']
@@ -107,5 +108,5 @@ class FitsImageSet(Dataset):
             radio_img_dat = self.radio_transform(radio_img_dat)
         if self.opt_transform:
             ps_imgcube = self.opt_transform(ps_imgcube)
+
         return radio_img_dat, ps_imgcube, wise_magnitude_info, cutout_position_info, label, (ps_id, ps_ra, ps_dec)
-        # return radio_img_dat, ps_imgcube, wise_magnitude_info, cutout_position_info, label

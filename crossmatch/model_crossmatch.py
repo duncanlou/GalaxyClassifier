@@ -17,8 +17,8 @@ class RadioOpticalCrossmatchModel(nn.Module):
         self.cnn_opt.conv1 = nn.Conv2d(5, 64, kernel_size=(7, 7), stride=(2, 2), padding=3)
         self.cnn_opt.fc = nn.Linear(self.cnn_opt.fc.in_features, 10)
 
-        self.fc1 = nn.Linear(20 + 10 + 3 + 2, 8)
-        self.fc2 = nn.Linear(8, 2)
+        self.fc1 = nn.Linear(20 + 10 + 3 + 3, 8)
+        self.fc2 = nn.Linear(8, 1)
 
     def forward(self, radio_img_data, ps_img_data, ps_source_class_probs, ps_cutouts_pos_info):
         x1 = self.cnn(radio_img_data)
