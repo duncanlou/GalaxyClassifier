@@ -32,14 +32,14 @@ class FitsImageSet(Dataset):
 
 
         self.df_samples = pd.concat([self.ps_p_samples, self.ps_n_samples], ignore_index=True)
-        self.ps_n_samples = self.df_samples.groupby("VLASS_component_name")
-        self.df_samples = self.df_samples.sample(frac=1)
 
+        self.df_samples = self.df_samples.sample(frac=1)
+        self.sample_groups = self.df_samples.groupby("VLASS_component_name")
         self.radio_transform = radio_transform
         self.opt_transform = opt_transform
 
     def __len__(self):
-        return len(self.df_samples)
+        return len(self.sample_groups)
 
     def create_PS_cutout(self, opt_sample: pd.Series):
         radio_component_name = opt_sample["VLASS_component_name"]

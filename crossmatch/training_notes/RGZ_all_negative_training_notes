@@ -10,3 +10,4 @@ Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_
 0.04084554278639993, 0.04058631892565484, 0.9798005543696435, 0.9806295399515739
 0.04092085601865738, 0.042408955207548185, 0.9804059005320674, 0.980119791002931
 Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy
+Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy

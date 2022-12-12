@@ -3,3 +3,4 @@
 .idea
 /runs/
 !/test_file.py
+/crossmatch/catalogs/
