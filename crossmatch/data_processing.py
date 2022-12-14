@@ -1,15 +1,20 @@
-import pandas as pd
+from utils import append_new_line
 
 if __name__ == '__main__':
-    df_p_Norris = pd.read_csv("../data/preprocessed_cat/PS_p_Norris06_samples.csv")
-
-    df_n = pd.read_csv("../data/preprocessed_cat/PS_n_samples.csv")
-
-    df_n_Norris_all = df_n[df_n.VLASS_component_name.isin(df_p_Norris.VLASS_component_name)].reset_index(drop=True)
-
-    # df_n_2 = df_n_1.groupby("VLASS_component_name").apply(lambda x: x.sample(n=1))
-    df_n_Norris_all.to_csv("../data/preprocessed_cat/PS_n_samples_Norris_all.csv", index=False)
-    # df_p.to_csv("../data/preprocessed_cat/PS_p_samples_RGZ_ROGUE1000.csv", index=False)
+    append_new_line("training_notes/test_notes.txt",
+                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
+    append_new_line("training_notes/test_notes.txt",
+                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
+    append_new_line("training_notes/test_notes.txt",
+                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
+    # df_p = pd.read_csv("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/preprocessed_cat/PS_p_samples.csv")
+    # df_n = pd.read_csv("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/preprocessed_cat/PS_n_samples.csv")
+    #
+    # df_p_ROGUE = df_p[df_p["Catalog_From"] == 'Norris06']
+    # df_n_ROGUE = df_n[df_n["Catalog_From"] == 'Norris06']
+    #
+    # df_p_ROGUE.to_csv("../data/preprocessed_cat/PS_p_Norris06_samples.csv", index=False)
+    # df_n_ROGUE.to_csv("../data/preprocessed_cat/PS_n_Norris06_samples.csv", index=False)
 
     # bad_files = []
     #

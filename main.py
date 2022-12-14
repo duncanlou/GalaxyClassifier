@@ -3,7 +3,9 @@ import time
 
 import numpy as np
 import torch
+import torch.optim as optim
 from matplotlib import pyplot as plt
+from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -61,7 +63,7 @@ training_loader = DataLoader(
     trainset,
     batch_size=batch_size,
     shuffle=True,
-    num_workers=8,
+    num_workers=16,
 )
 
 validation_loader = DataLoader(
@@ -193,7 +195,7 @@ def test_accuracy(net):
             inputs, labels, wise_asinh_mag = inputs.to(device), labels.to(device), wise_asinh_mag.to(device)
             image = inputs.float()
             wise_asinh_mag = wise_asinh_mag.float()
-            outputs = net(image, wise_asinh_mag)
+            outputs, extracted_features = net(image, wise_asinh_mag)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
@@ -233,25 +235,16 @@ def visualize_model(model, validation_dataloader, num_images=9):
         model.train(mode=was_training)
 
 
-def set_ps_model():
-    ps_source_classification_model = CelestialClassficationNet()
-    ps_source_classification_model.load_state_dict(torch.load("data/trained_model/PS_classification_model_wts.pt"))
-    ps_source_classification_model.eval()
-    ps_source_classification_model.to(device)
-    return ps_source_classification_model
+model = CelestialClassficationNet().to(device)
 
+criterion = nn.CrossEntropyLoss()
 
-# model = CelestialClassficationNet().to(device)
-#
-# criterion = nn.CrossEntropyLoss()
-#
-# # Observe that all parameters are being optimized
-# optimizer_ft = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-# # Decay LR by a factor of 0.1 every 7 epochs
-# exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-#
-# model_ft = train_model(model, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25)
-model_ft = set_ps_model()
+# Observe that all parameters are being optimized
+optimizer_ft = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+# Decay LR by a factor of 0.1 every 7 epochs
+exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+
+model_ft = train_model(model, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25)
 test_accuracy(model_ft)
 
 # visualize_model(model_ft, validation_dataloader=validation_loader)

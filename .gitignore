@@ -1,6 +1,6 @@
 /images14/
+data
 /.idea
 .idea
 /runs/
 !/test_file.py
-/crossmatch/catalogs/
