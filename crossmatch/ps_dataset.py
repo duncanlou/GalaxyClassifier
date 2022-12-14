@@ -27,19 +27,16 @@ class FitsImageSet(Dataset):
         assert len(self.ps_background_cutouts) == len(self.radio_sources)
 
         self.ps_p_samples = pd.read_csv(ps_positive_samples_csv)
-
         self.ps_n_samples = pd.read_csv(ps_negative_samples_csv)
 
-
         self.df_samples = pd.concat([self.ps_p_samples, self.ps_n_samples], ignore_index=True)
-
         self.df_samples = self.df_samples.sample(frac=1)
-        self.sample_groups = self.df_samples.groupby("VLASS_component_name")
+        # self.sample_groups = self.df_samples.groupby("VLASS_component_name")
         self.radio_transform = radio_transform
         self.opt_transform = opt_transform
 
     def __len__(self):
-        return len(self.sample_groups)
+        return len(self.df_samples)
 
     def create_PS_cutout(self, opt_sample: pd.Series):
         radio_component_name = opt_sample["VLASS_component_name"]
@@ -78,7 +75,6 @@ class FitsImageSet(Dataset):
     def __getitem__(self, idx):
         opt_sample: pd.Series = self.df_samples.iloc[idx]
         radio_component_name = opt_sample["VLASS_component_name"]
-
         radio_img_dat = self.preprocess_radio_image(radio_component_name)
 
         cutouts_for_one_PS_source = self.create_PS_cutout(opt_sample)
@@ -109,4 +105,5 @@ class FitsImageSet(Dataset):
         if self.opt_transform:
             ps_imgcube = self.opt_transform(ps_imgcube)
 
-        return radio_img_dat, ps_imgcube, wise_magnitude_info, cutout_position_info, label, (ps_id, ps_ra, ps_dec)
+        return radio_img_dat, ps_imgcube, wise_magnitude_info, cutout_position_info, label, (
+        radio_component_name, ps_id, ps_ra, ps_dec)

@@ -5,9 +5,7 @@ import time
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -184,9 +182,7 @@ def train_model(ps_model, model, criterion, optimizer, num_epochs=25):
                     wise_asinh_mag = wise_asinh_mag.float()
 
                     ps_model_outputs = ps_model(ps_imgcube, wise_asinh_mag)
-                    # ps_source_class_probs = F.softmax(ps_model_outputs, dim=1)
 
-                    # outputs = model(radio_image, ps_imgcube, ps_source_class_probs, cutout_position_info)
                     outputs = model(radio_image, ps_imgcube, ps_model_outputs, cutout_position_info)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
@@ -252,17 +248,19 @@ def test_accuracy(ps_model, net):
             wise_asinh_mag = wise_asinh_mag.float()
 
             ps_model_outputs = ps_model(ps_imgcube, wise_asinh_mag)
-            # ps_source_class_probs = F.softmax(ps_model_outputs, dim=1)
+            source_class_probs = F.softmax(ps_model_outputs, dim=1)
 
-            # outputs = net(radio_image, ps_imgcube, ps_source_class_probs, cutout_position_info)
-            outputs = net(radio_image, ps_imgcube, ps_model_outputs, cutout_position_info)
+            outputs = net(radio_image, ps_imgcube, source_class_probs, cutout_position_info)
             radio_host_probs = F.softmax(outputs, dim=1)
             radio_host_prob_list = radio_host_probs.tolist()
             host_prob = radio_host_prob_list[0]
 
-            ps_id = ps_source_identity[0].item()
-            ps_ra = ps_source_identity[1].item()
-            ps_dec = ps_source_identity[2].item()
+            VLASS_component_name = ps_source_identity[0][0]
+            ps_id = ps_source_identity[1].item()
+            ps_ra = ps_source_identity[2].item()
+            ps_dec = ps_source_identity[3].item()
+
+            class_probs_list = source_class_probs.tolist()
 
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -270,8 +268,9 @@ def test_accuracy(ps_model, net):
 
             pred = predicted.item()
             lab = labels.item()
-            b = pred == lab
-            append_new_line(testing_note_file, f"{ps_id}, {ps_ra}, {ps_dec}, {host_prob[0]}, {host_prob[1]}, {b}")
+
+            append_new_line(testing_note_file,
+                            f"{VLASS_component_name}, {ps_id}, {ps_ra}, {}, {}, {}, {ps_dec}, {host_prob[0]}, {host_prob[1]}, {lab}, {pred}")
 
             for t, p in zip(labels.view(-1), predicted.view(-1)):
                 confusion_matrix[t.long(), p.long()] += 1
@@ -300,19 +299,20 @@ def set_radio_model():
 
 if __name__ == '__main__':
     ps_model = set_ps_model()
-    # radio_model = set_radio_model()
-    # append_new_line(testing_note_file,
-    #                 "VLASS_component_name, PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
-    # test_accuracy(ps_model, radio_model)
-
-    x_model = RadioOpticalCrossmatchModel().to(device)
-
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(x_model.parameters(), lr=0.001, weight_decay=0.0001)
-
-    model_ft = train_model(ps_model, x_model, loss_fn, optimizer, num_epochs=10)
-
+    radio_model = set_radio_model()
     append_new_line(testing_note_file,
-                    "PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
+                    "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Groud_Truth, Prediction")
 
-    test_accuracy(ps_model, model_ft)
+    test_accuracy(ps_model, radio_model)
+
+    # x_model = RadioOpticalCrossmatchModel().to(device)
+    #
+    # loss_fn = nn.CrossEntropyLoss()
+    # optimizer = Adam(x_model.parameters(), lr=0.001, weight_decay=0.0001)
+    #
+    # model_ft = train_model(ps_model, x_model, loss_fn, optimizer, num_epochs=10)
+    #
+    # append_new_line(testing_note_file,
+    #                 "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Groud_Truth, Prediction")
+
+    # test_accuracy(ps_model, model_ft)
