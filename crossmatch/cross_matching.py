@@ -110,16 +110,15 @@ train_loader = DataLoader(
 
 validation_loader = DataLoader(
     validset,
-    batch_size=1,
-    shuffle=True,
-    num_workers=2
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=8
 )
 
 test_loader = DataLoader(
     testset,
     batch_size=1,
     shuffle=False,
-    num_workers=2
 )
 
 dataloaders = {'train': train_loader, 'val': validation_loader, 'test': test_loader}
@@ -299,7 +298,7 @@ if __name__ == '__main__':
     ps_model = set_ps_model()
     radio_model = set_radio_model()
     append_new_line(testing_note_file,
-                    "PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
+                    "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Prob_not_a_host, Prob_host")
     test_accuracy(ps_model, radio_model)
 
     # x_model = RadioOpticalCrossmatchModel().to(device)
