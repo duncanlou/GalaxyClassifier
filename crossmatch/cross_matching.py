@@ -16,7 +16,8 @@ from utils import append_new_line
 from xmatch_dataset import XMatchDataset
 
 OPT_SOURCE_CLASSIFICATION_MODEL_PATH = "models/opt_classification_model_wts.pt"
-RADIO_MODEL_PATH = "models/crossmatch_model_wts.pt"
+RADIO_MODEL_PATH = "models/RGZ_all_negative_crossmatch_model_wts.pt"
+
 VLASS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/VLASS_training_data"
 PS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/PS_training_data"
 
@@ -32,11 +33,7 @@ lr = 3e-5
 gamma = 0.7
 seed = 42
 
-training_note_file = "training_notes/crossmatch_model_training_notes3.txt"
-testing_note_file = "training_notes/Norris06_data_test_notes.txt"
-
-append_new_line(training_note_file,
-                "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
+testing_note_file = "training_notes/RGZ_all_negative_Norris_testing_notes.csv"
 
 
 def seed_everything(seed):
@@ -58,9 +55,8 @@ radio_transform = {
     'train': transforms.Compose([
         transforms.ToTensor(),
         transforms.CenterCrop(216),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
         transforms.RandomInvert(),
+        transforms.GaussianBlur(3)
     ]),
     'val': transforms.Compose([
         transforms.ToTensor(),
@@ -72,7 +68,8 @@ def create_testData():
     testDataset = FitsImageSet(radio_root_dir=VLASS_IMAGE_ROOT,
                                opt_root_dir=PS_IMAGE_ROOT,
                                ps_positive_samples_csv="../data/preprocessed_cat/PS_p_Norris06_samples.csv",
-                               ps_negative_samples_csv="../data/preprocessed_cat/PS_n_Norris06_samples.csv")
+                               ps_negative_samples_csv="../data/preprocessed_cat/PS_n_Norris06_samples.csv",
+                               )
     testData = XMatchDataset(testDataset, radio_transform=radio_transform['val'], opt_transform=opt_transform)
     indices = list(range(len(testData)))
     np.random.shuffle(indices)
@@ -82,8 +79,8 @@ def create_testData():
 
 whole_dataset = FitsImageSet(radio_root_dir=VLASS_IMAGE_ROOT,
                              opt_root_dir=PS_IMAGE_ROOT,
-                             ps_positive_samples_csv="../data/preprocessed_cat/PS_p_ROGUE_samples.csv",
-                             ps_negative_samples_csv="../data/preprocessed_cat/PS_n_ROGUE_samples.csv")
+                             ps_positive_samples_csv="../data/preprocessed_cat/PS_p_RGZ_samples.csv",
+                             ps_negative_samples_csv="../data/preprocessed_cat/PS_n_samples_RGZ_all.csv")
 trainData = XMatchDataset(whole_dataset, radio_transform=radio_transform['train'], opt_transform=opt_transform)
 validationData = XMatchDataset(whole_dataset, radio_transform=radio_transform['val'], opt_transform=opt_transform)
 
@@ -110,8 +107,8 @@ train_loader = DataLoader(
 
 validation_loader = DataLoader(
     validset,
-    batch_size=batch_size,
-    shuffle=False,
+    batch_size=8,
+    shuffle=True,
     num_workers=8
 )
 
@@ -126,11 +123,6 @@ dataloaders = {'train': train_loader, 'val': validation_loader, 'test': test_loa
 print("Train set size: ", len(trainset))
 print("Validation set size: ", len(validset))
 print("Test set size: ", len(testset))
-
-training_epoch_loss = []
-validation_epoch_loss = []
-training_epoch_accuracy = []
-validation_epoch_accuracy = []
 
 
 # Get one batch of training data
@@ -180,9 +172,7 @@ def train_model(ps_model, model, criterion, optimizer, num_epochs=25):
                     wise_asinh_mag = wise_asinh_mag.float()
 
                     ps_model_outputs = ps_model(ps_imgcube, wise_asinh_mag)
-                    # ps_source_class_probs = F.softmax(ps_model_outputs, dim=1)
 
-                    # outputs = model(radio_image, ps_imgcube, ps_source_class_probs, cutout_position_info)
                     outputs = model(radio_image, ps_imgcube, ps_model_outputs, cutout_position_info)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
@@ -202,20 +192,13 @@ def train_model(ps_model, model, criterion, optimizer, num_epochs=25):
             print('{} Loss: {:.6f} Acc: {:.6f}'.format(
                 phase, epoch_loss, epoch_acc))
 
-            if phase == 'train':
-                training_epoch_loss.append(epoch_loss)
-                training_epoch_accuracy.append(epoch_acc)
-            else:
-                validation_epoch_loss.append(epoch_loss)
-                validation_epoch_accuracy.append(epoch_acc)
+
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
 
-        append_new_line(training_note_file,
-                        f"{training_epoch_loss[-1]}, {validation_epoch_loss[-1]}, {training_epoch_accuracy[-1]}, {validation_epoch_accuracy[-1]}")
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -248,17 +231,15 @@ def test_accuracy(ps_model, net):
             wise_asinh_mag = wise_asinh_mag.float()
 
             ps_model_outputs = ps_model(ps_imgcube, wise_asinh_mag)
-            # ps_source_class_probs = F.softmax(ps_model_outputs, dim=1)
-
-            # outputs = net(radio_image, ps_imgcube, ps_source_class_probs, cutout_position_info)
             outputs = net(radio_image, ps_imgcube, ps_model_outputs, cutout_position_info)
             radio_host_probs = F.softmax(outputs, dim=1)
             radio_host_prob_list = radio_host_probs.tolist()
             host_prob = radio_host_prob_list[0]
 
-            ps_id = ps_source_identity[0].item()
-            ps_ra = ps_source_identity[1].item()
-            ps_dec = ps_source_identity[2].item()
+            VLASS_component_name = ps_source_identity[0][0]
+            ps_id = ps_source_identity[1].item()
+            ps_ra = ps_source_identity[2].item()
+            ps_dec = ps_source_identity[3].item()
 
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -266,8 +247,9 @@ def test_accuracy(ps_model, net):
 
             pred = predicted.item()
             lab = labels.item()
-            b = pred == lab
-            append_new_line(testing_note_file, f"{ps_id}, {ps_ra}, {ps_dec}, {host_prob[0]}, {host_prob[1]}, {b}")
+
+            append_new_line(testing_note_file,
+                            f"{VLASS_component_name}, {ps_id}, {ps_ra}, {ps_dec}, {host_prob[0]}, {host_prob[1]}, {lab}, {pred}")
 
             for t, p in zip(labels.view(-1), predicted.view(-1)):
                 confusion_matrix[t.long(), p.long()] += 1
@@ -298,7 +280,8 @@ if __name__ == '__main__':
     ps_model = set_ps_model()
     radio_model = set_radio_model()
     append_new_line(testing_note_file,
-                    "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Prob_not_a_host, Prob_host")
+                    "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Groud_Truth, Prediction")
+
     test_accuracy(ps_model, radio_model)
 
     # x_model = RadioOpticalCrossmatchModel().to(device)
@@ -308,6 +291,7 @@ if __name__ == '__main__':
     #
     # model_ft = train_model(ps_model, x_model, loss_fn, optimizer, num_epochs=10)
     #
-    # append_new_line(testing_note_file, "PS source id, PS source ra, PS source dec, Host likelihood, Non-host likelihood, Prediction_result")
-    #
+    # append_new_line(testing_note_file,
+    #                 "VLASS_component_name, PS source id, PS source ra, PS source dec, Non-host likelihood, Host likelihood, Groud_Truth, Prediction")
+
     # test_accuracy(ps_model, model_ft)

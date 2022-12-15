@@ -1,20 +1,19 @@
-from utils import append_new_line
+import os.path
+import shutil
 
 if __name__ == '__main__':
-    append_new_line("training_notes/test_notes.txt",
-                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
-    append_new_line("training_notes/test_notes.txt",
-                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
-    append_new_line("training_notes/test_notes.txt",
-                    "Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy")
-    # df_p = pd.read_csv("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/preprocessed_cat/PS_p_samples.csv")
-    # df_n = pd.read_csv("/home/duncan/PycharmProjects/MyResearchProject_Duncan/data/preprocessed_cat/PS_n_samples.csv")
-    #
-    # df_p_ROGUE = df_p[df_p["Catalog_From"] == 'Norris06']
-    # df_n_ROGUE = df_n[df_n["Catalog_From"] == 'Norris06']
-    #
-    # df_p_ROGUE.to_csv("../data/preprocessed_cat/PS_p_Norris06_samples.csv", index=False)
-    # df_n_ROGUE.to_csv("../data/preprocessed_cat/PS_n_Norris06_samples.csv", index=False)
+    VLASS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/VLASS_training_data"
+    # df = pd.read_csv("../data/preprocessed_cat/PS_p_RGZ_samples.csv")
+    # T = Table.from_pandas(df)
+    # component_names = list(T["VLASS_component_name"])
+    files = os.listdir(VLASS_IMAGE_ROOT)
+
+    count = 0
+    for name in files:
+        count += 1
+        print(count)
+        file_name = os.path.join(VLASS_IMAGE_ROOT, f"{name}")
+        shutil.copy(src=file_name, dst=f"../RGZ_fits_files/{name}")
 
     # bad_files = []
     #
