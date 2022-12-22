@@ -3,9 +3,7 @@ import time
 
 import numpy as np
 import torch
-import torch.optim as optim
-from matplotlib import pyplot as plt
-from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -13,12 +11,13 @@ from torchvision import transforms
 from FitsImageFolder import FitsImageFolder
 from mynetwork import CelestialClassficationNet
 from optical_dataset import OptDataSet
+from utils import append_new_line
 
 print("torch version: ", torch.__version__)
-batch_size = 16
+batch_size = 8
 # src_root_path = '/mnt/DataDisk/Duncan/sources'
-src_root_path = '/mnt/DataDisk/Duncan/sources_for_Sean'
-# src_root_path = '/mnt/DataDisk/Duncan/PS_small_set'
+# src_root_path = '/mnt/DataDisk/Duncan/sources_for_Sean'
+src_root_path = '/mnt/DataDisk/Duncan/PS_small_set'
 print(src_root_path)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"using device: {device}")
@@ -63,7 +62,7 @@ training_loader = DataLoader(
     trainset,
     batch_size=batch_size,
     shuffle=True,
-    num_workers=16,
+    num_workers=8,
 )
 
 validation_loader = DataLoader(
@@ -75,9 +74,8 @@ validation_loader = DataLoader(
 
 test_loader = DataLoader(
     testset,
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=8,
+    batch_size=1,
+    shuffle=False
 )
 
 dataloaders = {'train': training_loader, 'val': validation_loader, 'test': test_loader}
@@ -94,10 +92,8 @@ validation_epoch_loss = []
 training_epoch_accuracy = []
 validation_epoch_accuracy = []
 
-note_files = "data/ps_source_training_notes"
+note_files = "data/ps_source_testing_notes.csv"
 
-with open(note_files, "w+") as f:
-    f.write("Training_epoch_loss, Validation_epoch_loss, Training_epoch_accuracy, Validation_epoch_accuracy\n")
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
@@ -134,7 +130,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 with torch.set_grad_enabled(phase == 'train'):
                     image = inputs.float()
                     wise_asinh_mag = wise_asinh_mag.float()
-                    outputs, extracted_features = model(image, wise_asinh_mag)
+                    outputs = model(image, wise_asinh_mag)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
 
@@ -191,11 +187,22 @@ def test_accuracy(net):
     total = 0
     net.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
     with torch.no_grad():
-        for i, (inputs, labels, wise_asinh_mag) in enumerate(test_loader):
+        for i, (inputs, labels, wise_asinh_mag, ps_coords) in enumerate(test_loader):
             inputs, labels, wise_asinh_mag = inputs.to(device), labels.to(device), wise_asinh_mag.to(device)
             image = inputs.float()
             wise_asinh_mag = wise_asinh_mag.float()
-            outputs, extracted_features = net(image, wise_asinh_mag)
+
+            ps_ra = ps_coords[0].item()
+            ps_dec = ps_coords[1].item()
+
+            outputs = net(image, wise_asinh_mag)
+            ps_source_class_probs = F.softmax(outputs, dim=1)
+
+            ps_source_class_probs = ps_source_class_probs.tolist()[0]
+            GALAXY_prob = ps_source_class_probs[0]
+            QSO_prob = ps_source_class_probs[1]
+            STAR_prob = ps_source_class_probs[2]
+
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
@@ -203,48 +210,39 @@ def test_accuracy(net):
             for t, p in zip(labels.view(-1), predicted.view(-1)):
                 confusion_matrix[t.long(), p.long()] += 1
 
+            pred = predicted.item()
+            lab = labels.item()
+
+            append_new_line(note_files,
+                            f"{ps_ra}, {ps_dec}, {GALAXY_prob}, {QSO_prob}, {STAR_prob}, {lab}, {pred}")
+
     print("confusion_matrix: ", confusion_matrix)
     print(confusion_matrix.diag() / confusion_matrix.sum(1))
     print("accuracy over all: ", correct / total)
     return correct / total
 
 
-def visualize_model(model, validation_dataloader, num_images=9):
-    was_training = model.training
-    model.eval()
-    images_so_far = 0
-    fig = plt.figure()
-
-    with torch.no_grad():
-        for i, (inputs, labels) in enumerate(validation_dataloader):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-
-            for j in range(inputs.size()[0]):
-                images_so_far += 1
-                ax = plt.subplot(num_images // 3, 3, images_so_far)
-                ax.set_title('predicted: {}'.format(class_names[preds[j]]))
-                showImages(inputs.cpu().data[j])
-
-                if images_so_far == num_images:
-                    model.train(mode=was_training)
-                    return
-        model.train(mode=was_training)
+def set_ps_model(model_path="crossmatch/models/opt_classification_model_wts.pt"):
+    ps_source_classification_model = CelestialClassficationNet()
+    ps_source_classification_model.load_state_dict(torch.load(model_path))
+    ps_source_classification_model.eval()
+    ps_source_classification_model.to(device)
+    return ps_source_classification_model
 
 
-model = CelestialClassficationNet().to(device)
+if __name__ == '__main__':
+    model_ft = set_ps_model(model_path="data/trained_model/PS_classification_model_wts.pt")
+    # model = CelestialClassficationNet().to(device)
+    #
+    # criterion = nn.CrossEntropyLoss()
+    #
+    # # Observe that all parameters are being optimized
+    # optimizer_ft = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    # # Decay LR by a factor of 0.1 every 7 epochs
+    # exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    #
+    # model_ft = train_model(model, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25)
+    with open(note_files, "w+") as f:
+        f.write("ra, dec, galaxy_prob, qso_prob, star_prob, label, predicted")
 
-criterion = nn.CrossEntropyLoss()
-
-# Observe that all parameters are being optimized
-optimizer_ft = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-# Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-
-model_ft = train_model(model, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=25)
-test_accuracy(model_ft)
-
-# visualize_model(model_ft, validation_dataloader=validation_loader)
+    test_accuracy(model_ft)

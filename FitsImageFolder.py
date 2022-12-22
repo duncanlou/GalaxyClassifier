@@ -11,8 +11,10 @@ from utils import remove_nan, cal_luptitude, CatPSimgMinMax
 
 T = Table.read('data/SDSSxWISE_cat.tbl', format='ipac')
 source_id_col = list(T['source_id'])
-w1flux = T['w1flux']
-w2flux = T['w2flux']
+
+
+# w1flux = T['w1flux']
+# w2flux = T['w2flux']
 
 
 def make_dataset(
@@ -125,8 +127,13 @@ class FitsImageFolder(DatasetFolder):
         paths = fits_name.split(os.path.sep)
         short_name = paths[-1]
         idx = source_id_col.index(short_name)
-        w1flux_single_source = w1flux[idx]
-        w2flux_single_source = w2flux[idx]
+        # w1flux_single_source = w1flux[idx]
+        # w2flux_single_source = w2flux[idx]
+        row = T[idx]
+        ps_ra = row['ra_01']
+        ps_dec = row['dec_01']
+        w1flux_single_source = row['w1flux']
+        w2flux_single_source = row['w2flux']
         m1, m2 = cal_luptitude(w1flux_single_source, w2flux_single_source)
         wise_magnitude_info = np.asarray([m1, m2])
         img_list = []
@@ -166,4 +173,4 @@ class FitsImageFolder(DatasetFolder):
 
         img_dat = np.stack(img_list, axis=2)
 
-        return img_dat, wise_magnitude_info
+        return img_dat, wise_magnitude_info, (ps_ra, ps_dec)

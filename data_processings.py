@@ -1,41 +1,23 @@
-import os.path
+import numpy as np
+import pandas as pd
 
-from astropy.io import fits
+from astropy.table import Table
 
-# already checked: iamges1, images2, images3, images4
-root = "/media/duncan/PANSTARRS_image_/PS_big_cutouts/North_ecliptic_region/images5"
+df_p = pd.read_csv("data/preprocessed_cat_new/PS_p_RGZ_samples.csv")
+T = Table.from_pandas(df_p)
+# def extended_or_compact(total_flux, e_total_f)
 
-sources = os.listdir(root)
-bad_sources = []
-count = 0
-
-for s in sources:
-    count += 1
-    print(count)
-    s_path = os.path.join(root, s)
-    fits_imgs = os.listdir(s_path)
-    # if len(fits_imgs) != 5:
-    #     bad_sources.append(s_path)
-    #     print(s)
-    for f in fits_imgs:
-        try:
-            img = fits.getdata(os.path.join(s_path, f))
-        except IOError as ioe:
-            print(ioe)
-            print(f"{s} is a bad source")
-            bad_sources.append(s_path)
-        except ValueError as vle:
-            print(vle)
-            print(f"{s} is a bad source")
-            bad_sources.append(s_path)
-        except TypeError as tpe:
-            print(tpe)
-            print(f"{s} is a bad source")
-            bad_sources.append(s_path)
-
-# redownload_path = "/home/duncan/PycharmProjects/bulk_download_sources/data/redownloaded"
-# names = os.listdir(redownload_path)
-# for name in names:
-#     source_path = os.path.join(redownload_path, name)
-#     dst = os.path.join(root, name)
-#     shutil.copytree(source_path, dst)
+for i in range(10):
+    row = T[i]
+    tflux = row['Total_flux']
+    pflux = row['Peak_flux']
+    e_tflux = row['E_Total_flux']
+    e_pflux = row['E_Peak_flux']
+    t1 = np.log(tflux / pflux)
+    t2 = (e_tflux / tflux) ** 2 + (e_pflux / pflux) ** 2
+    if t1 > 2 * np.sqrt(t2):
+        print("Extended",
+              f"{row['VLASS_component_name']}, DC_Maj: {row['DC_Maj']}, DC_Min: {row['DC_Min']}, DC_PA: {row['DC_PA']}")
+    else:
+        print("Compact",
+              f"{row['VLASS_component_name']}, DC_Maj: {row['DC_Maj']}, DC_Min: {row['DC_Min']}, DC_PA: {row['DC_PA']}")

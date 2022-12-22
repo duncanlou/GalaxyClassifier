@@ -20,10 +20,10 @@ class XMatchDataset(Dataset):
         ps_cutout_pos_info = sample[3]
         label = sample[4]
         ps_source_identity = sample[5]
+        VLASS_name = sample[6]
         if self.radio_transforms:
             radio_image_dat = self.radio_transforms(radio_image_dat)
         if self.opt_transforms:
             ps_imgcube = self.opt_transforms(ps_imgcube)
 
-        return radio_image_dat, ps_imgcube, wise_mag_info, ps_cutout_pos_info, label, ps_source_identity
-        # return radio_image_dat, ps_imgcube, wise_mag_info, ps_cutout_pos_info, label
+        return radio_image_dat, ps_imgcube, wise_mag_info, ps_cutout_pos_info, label, ps_source_identity, VLASS_name

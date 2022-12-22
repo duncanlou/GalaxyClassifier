@@ -2,18 +2,34 @@ import os.path
 import shutil
 
 if __name__ == '__main__':
-    VLASS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/VLASS_training_data"
+    VLASS_IMAGE_ROOT = "/mnt/DataDisk/Duncan/Pan-STARRS_Big_Cutouts/PS_training_data"
+    radio_components = ['VLASS1QLCIR J033537.02-273432.5',
+                        'VLASS1QLCIR J033113.95-275519.3',
+                        'VLASS1QLCIR J032746.89-271742.6',
+                        'VLASS1QLCIR J033125.03-281810.9',
+                        'VLASS1QLCIR J032636.78-280752.0',
+                        'VLASS1QLCIR J033457.89-272637.4',
+                        'VLASS1QLCIR J032916.31-272340.3',
+                        'VLASS1QLCIR J032718.99-284640.2',
+                        'VLASS1QLCIR J033241.99-273818.6',
+                        'VLASS1QLCIR J033226.96-274106.7',
+                        'VLASS1QLCIR J033111.67-273143.7',
+                        'VLASS1QLCIR J033210.72-272634.9',
+                        'VLASS1QLCIR J032910.90-272717.2',
+                        'VLASS1QLCIR J032642.35-280805.0',
+                        'VLASS1QLCIR J033009.38-281849.4',
+                        'VLASS1QLCIR J033438.54-272721.0',
+                        'VLASS1QLCIR J033449.00-281144.5',
+                        'VLASS1QLCIR J032933.82-284139.4',
+                        'VLASS1QLCIR J032934.26-273431.5',
+                        'VLASS1QLCIR J033129.72-281817.8']
     # df = pd.read_csv("../data/preprocessed_cat/PS_p_RGZ_samples.csv")
     # T = Table.from_pandas(df)
     # component_names = list(T["VLASS_component_name"])
-    files = os.listdir(VLASS_IMAGE_ROOT)
 
-    count = 0
-    for name in files:
-        count += 1
-        print(count)
-        file_name = os.path.join(VLASS_IMAGE_ROOT, f"{name}")
-        shutil.copy(src=file_name, dst=f"../RGZ_fits_files/{name}")
+    for name in radio_components:
+        dir_name = os.path.join(VLASS_IMAGE_ROOT, name)
+        shutil.copytree(src=dir_name, dst=f"wrongly_predicted_Norris_ps/{dir_name}")
 
     # bad_files = []
     #
